@@ -82,7 +82,7 @@ void WriteVTP(vtkPolyData *writePolyData,std::string attachName)
 
   vtkSmartPointer<vtkXMLPolyDataWriter> writer  = vtkSmartPointer<vtkXMLPolyDataWriter>::New();
   
-  outputFilename = "/Users/adamupdegrove/Documents/Intersect/Tests/"+attachName+".vtp";
+  outputFilename = "/Users/adamupdegrove/Documents/Code/vtkBoolean/Tests/"+attachName+".vtp";
 
   writer->SetFileName(outputFilename.c_str());
 #if VTK_MAJOR_VERSION <= 5
