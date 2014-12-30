@@ -1,0 +1,1243 @@
+/*=========================================================================
+
+  Program:   Visualization Toolkit
+  Module:    vtkBooleanOperationPolyDataFilterMine.cxx
+
+  Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+  All rights reserved.
+  See Copyright.txt or http://www.kitware.com/Copyright.htm for details.
+
+     This software is distributed WITHOUT ANY WARRANTY; without even
+     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+     PURPOSE.  See the above copyright notice for more information.
+
+=========================================================================*/
+#include "vtkBooleanOperationPolyDataFilterMine.h"
+
+#include "vtkCellData.h"
+#include "vtkDoubleArray.h"
+#include "vtkFloatArray.h"
+#include "vtkGenericCell.h"
+#include "vtkInformation.h"
+#include "vtkInformationVector.h"
+#include "vtkIntersectionPolyDataFilterMine.h"
+#include "vtkObjectFactory.h"
+#include "vtkPointData.h"
+#include "vtkSmartPointer.h"
+#include "vtkXMLPolyDataWriter.h"
+#include "vtkPolyDataNormals.h"
+#include "vtkFillHolesFilter.h"
+#include "vtkTransform.h"
+#include "vtkTransformPolyDataFilter.h"
+#include "vtkCellArray.h"
+#include "vtkTriangle.h"
+#include "vtkMath.h"
+#include "vtkThreshold.h"
+#include "vtkMergeCells.h"
+#include "vtkAppendPolyData.h"
+#include "vtkDataSetSurfaceFilter.h"
+#include "vtkUnstructuredGrid.h"
+#include "vtkCleanPolyData.h"
+#include "vtkPointLocator.h"
+
+
+//class Loop 
+//{
+//  public:
+//
+//    Loop();
+//    Loop(vtkIdType startPt);
+//    ~Loop();
+//
+//    GetFirstPoint();
+//    GetLastPoint();
+//    RunLoopFunction(int functiontype::functiontype);
+//
+//  private:
+//    LoopPt *firstPt;
+//    LoopPt *lastPt;
+//}
+//
+//class LoopPt
+//{
+//  friend class Loop;
+//
+//  public:
+//
+//    LoopPt();
+//    LoopPt(int val);
+//    ~LoopPt();
+//
+//    GetNextPoint();
+//
+//  private:
+//    int value;
+//    LoopPt *next;
+//}
+
+//Function to write the polydata to a vtp
+void WriteVTP(vtkPolyData *writePolyData,std::string attachName)
+{
+  std::string outputFilename;
+
+  vtkSmartPointer<vtkXMLPolyDataWriter> writer  = vtkSmartPointer<vtkXMLPolyDataWriter>::New();
+  
+  outputFilename = "/Users/adamupdegrove/Documents/Intersect/Tests/"+attachName+".vtp";
+
+  writer->SetFileName(outputFilename.c_str());
+#if VTK_MAJOR_VERSION <= 5
+  writer->SetInput(writePolyData);
+#else
+  writer->SetInputData(writePolyData);
+#endif
+  //writer->SetDataModeToAscii();
+
+  writer->Write();
+}   
+
+class vtkBooleanOperationPolyDataFilterMine::Impl
+{
+public:
+  Impl();
+  virtual ~Impl();
+
+  void Initialize();
+  void SetCheckArrays();
+  void SetBoundaryArrays();
+  void GetBooleanRegions(int inputIndex);
+  void DetermineIntersection();
+
+protected:
+
+  void OrientSingleLoop(int inputIndex,vtkIdType interPt,vtkIdType nextCell,
+      bool *usedPt);
+
+  int RunLoopFind(vtkIdType interPt,vtkIdType nextCell,
+      bool *usedPt);
+
+  int GetCellOrientation(vtkPolyData *pd,vtkIdType cellId, double pt0[3], double pt1[3],
+    int index);
+
+  int FindRegion(int inputIndex, int fillnumber, int start);
+
+  int FindRegionTipToe(int inputIndex, int fillnumber);
+
+public:
+
+  int intersectionCase;
+  
+  vtkPolyData *Mesh[2];
+  vtkPolyData *IntersectionLines;
+
+  vtkIntArray *BoundaryPointArray[2];
+  vtkIntArray *BoundaryCellArray[2];
+  vtkIntArray *BooleanArray[2];
+  vtkIntArray *NewCellIds[2];
+  vtkIntArray *OrientedCellArray[2];
+  vtkIntArray *FalsePositiveArray[2];
+
+  vtkIdType *checked[2];
+  vtkIdType *checkedcarefully[2];
+  vtkIdType *pointMapper[2];
+
+  vtkIdList *CheckCells;
+  vtkIdList *CheckCells2;
+  vtkIdList *CheckCellsCareful;
+  vtkIdList *CheckCellsCareful2;
+};
+
+vtkBooleanOperationPolyDataFilterMine::Impl::Impl() :
+  CheckCells(0), CheckCells2(0), CheckCellsCareful(0), 
+  CheckCellsCareful2(0)
+{
+  for (int i = 0;i<2;i++)
+  {
+    this->Mesh[i] = vtkPolyData::New();
+
+    this->BooleanArray[i] = vtkIntArray::New();
+    this->BoundaryPointArray[i] = vtkIntArray::New();
+    this->BoundaryCellArray[i] = vtkIntArray::New();
+    this->OrientedCellArray[i] = vtkIntArray::New();
+    this->FalsePositiveArray[i] = vtkIntArray::New();
+    this->NewCellIds[i] = vtkIntArray::New();
+
+    this->checked[i] = NULL;
+    this->checkedcarefully[i] = NULL;
+    this->pointMapper[i] = NULL;
+  }
+  this->IntersectionLines = vtkPolyData::New();
+  this->CheckCells = vtkIdList::New();
+  this->CheckCells2 = vtkIdList::New();
+  this->CheckCellsCareful = vtkIdList::New();
+  this->CheckCellsCareful2 = vtkIdList::New();
+
+  this->intersectionCase = 0;
+}
+
+vtkBooleanOperationPolyDataFilterMine::Impl::~Impl()
+{
+  for (int i = 0;i<2;i++)
+  {
+    this->Mesh[i]->Delete();
+    this->BooleanArray[i]->Delete();
+    this->BoundaryPointArray[i]->Delete();
+    this->BoundaryCellArray[i]->Delete();
+    this->OrientedCellArray[i]->Delete();
+    this->FalsePositiveArray[i]->Delete();
+    this->NewCellIds[i]->Delete();
+
+    delete [] this->checked[i];
+    delete [] this->checkedcarefully[i];
+    delete [] this->pointMapper[i];
+  }
+  this->IntersectionLines->Delete();
+  this->CheckCells->Delete();
+  this->CheckCells2->Delete();
+  this->CheckCellsCareful->Delete();
+  this->CheckCellsCareful2->Delete();
+}
+
+int vtkBooleanOperationPolyDataFilterMine::Impl::FindRegion(int inputIndex,
+    int fillnumber, int start)
+{
+  std::cout<<"Finding region with fill "<<fillnumber<<" of mesh "<<inputIndex
+    <<" and is start "<<start<<endl;
+    //Variables used in function
+    int i;
+    double boundarypt[3];
+    double pt1[3];
+    double pt2[3];
+    vtkIdType j,k,l; 
+    vtkIdType *pts = 0;
+    vtkIdType npts = 0;
+    vtkIdType cellId;
+    vtkIdType numNei, nei, p1, p2, nIds, neiId;
+
+    //Id List to store neighbor cells for each set of nodes and a cell
+    vtkSmartPointer<vtkIdList> neighbors = vtkSmartPointer<vtkIdList>::New();
+    vtkSmartPointer<vtkIdList> tmp = vtkSmartPointer<vtkIdList>::New();
+
+    vtkIdType numCheckCells;
+    //Get neighboring cell for each pair of points in current cell
+    //While there are still cells to be checked, find neighbor cells
+    while ((numCheckCells = this->CheckCells->GetNumberOfIds()) > 0)
+    {
+      //std::cout<<"Inside"<<endl;
+      for (int c=0;c<numCheckCells;c++)
+      {
+	cellId = this->CheckCells->GetId(c);
+	//Get the three points of the cell
+	this->Mesh[inputIndex]->GetCellPoints(cellId,npts,pts);
+	if (this->checked[inputIndex][cellId] == 0)
+	{
+	  //Mark cell as checked and insert the fillnumber value to cell
+          this->BooleanArray[inputIndex]->InsertValue(cellId,fillnumber);
+	  this->checked[inputIndex][cellId] = 1;
+          for (i=0; i < npts; i++)
+          {
+	    p1 = pts[i];
+	    //Get the cells attached to each point
+	    this->Mesh[inputIndex]->GetPointCells(p1,neighbors);
+	    numNei = neighbors->GetNumberOfIds();
+
+	    //For each neighboring cell
+	    for (j=0;j < numNei;j++)
+	    {
+	      //If this cell is close to a boundary
+	      if (this->BoundaryCellArray[inputIndex]->GetValue(neighbors->GetId(j)))
+	      {
+		//If this cell hasn't been checked already
+		if (this->checkedcarefully[inputIndex][neighbors->GetId(j)] == 0)
+		{
+		  //Add this cell to the careful check cells list and run
+		  //the region finding tip toe code
+	          this->CheckCellsCareful->InsertNextId(neighbors->GetId(j));
+                  //std::cout<<"I have been added carefully"<<neighbors->GetId(j)<<endl;
+		  this->FindRegionTipToe(inputIndex,fillnumber);
+		  this->CheckCellsCareful->Reset();
+		  this->CheckCellsCareful2->Reset();
+		}
+	      }
+	      //Cell needs to be added to check list 
+	      else
+	      {
+                //std::cout<<"I have been added real"<<neighbors->GetId(j)<<endl;
+		this->CheckCells2->InsertNextId(neighbors->GetId(j));
+	      }
+	    }
+
+	  }
+
+	}
+	//This statement is for if the start cell is a boundary cell
+	else if (this->checkedcarefully[inputIndex][cellId] == 0 && start)
+	{
+	  //std::cout<<"Aqui senor"<<endl;
+	  start=0;
+	  this->CheckCells->Reset();
+          //std::cout<<"I have been added begin"<<cellId<<endl;
+	  this->CheckCellsCareful->InsertNextId(cellId);
+	  this->FindRegionTipToe(inputIndex,fillnumber);
+	}
+      }
+
+      //Swap the current check list to the full check list and continue
+      tmp = this->CheckCells;
+      this->CheckCells = this->CheckCells2;
+      this->CheckCells2 = tmp;
+      tmp->Reset();
+    }
+    return 1;
+}
+
+int vtkBooleanOperationPolyDataFilterMine::Impl::FindRegionTipToe(
+    int inputIndex, int fillnumber)
+{
+  //std::cout<<"Am tip toeing"<<endl;
+    //Variables used in function
+    int i;
+    double boundarypt[3];
+    double pt1[3];
+    double pt2[3];
+    vtkIdType j,k,l; 
+    vtkIdType *pts = 0;
+    vtkIdType npts = 0;
+    vtkIdType cellId;
+    vtkIdType numNei, nei, p1, p2, nIds, neiId;
+
+    //Id List to store neighbor cells for each set of nodes and a cell
+    vtkSmartPointer<vtkIdList> tmp = vtkSmartPointer<vtkIdList>::New();
+    vtkSmartPointer<vtkIdList> neiIds = vtkSmartPointer<vtkIdList>::New();
+
+    //Variable for accessing neiIds list
+    vtkIdType sz = 0;
+    
+    //Variables for the boundary cells adjacent to the boundary point
+    vtkSmartPointer<vtkIdList> bLinesOne = vtkSmartPointer<vtkIdList>::New();
+    vtkSmartPointer<vtkIdList> bLinesTwo = vtkSmartPointer<vtkIdList>::New();
+
+    vtkIdType numCheckCells;
+    //Get neighboring cell for each pair of points in current cell
+    //While there are still cells to be checked
+    while ((numCheckCells = this->CheckCellsCareful->GetNumberOfIds()) > 0)
+    {
+      for (int c=0;c<numCheckCells;c++)
+      {
+        neiIds->Reset();
+	cellId = this->CheckCellsCareful->GetId(c);
+	//Get the three points of the cell
+	this->Mesh[inputIndex]->GetCellPoints(cellId,npts,pts);
+	if (this->checkedcarefully[inputIndex][cellId] == 0)
+	{
+          //Update this cell to have been checked carefully and assign it 
+	  //with the fillnumber scalar
+          this->BooleanArray[inputIndex]->InsertValue(cellId,fillnumber);
+	  this->checkedcarefully[inputIndex][cellId] = 1;
+	  //For each edge of the cell
+	  //std::cout<<"Checking edges of cell "<<cellId<<endl;
+          for (i=0; i < npts; i++)
+          {
+	    p1 = pts[i];
+	    p2 = pts[(i+1)%(npts)];
+
+            vtkSmartPointer<vtkIdList> neighbors = vtkSmartPointer<vtkIdList>::New();
+	    //Initial check to make sure the cell is in fact a face cell
+	    this->Mesh[inputIndex]->GetCellEdgeNeighbors(cellId,p1,p2,neighbors);
+	    numNei = neighbors->GetNumberOfIds();
+
+	    //Check to make sure it is an oustide surface cell, 
+	    //i.e. one neighbor
+	    if (numNei==1)
+	    {
+              int count = 0;
+		//Check to see if cell is on the boundary, 
+		//if it is get adjacent lines
+	      if (this->BoundaryPointArray[inputIndex]->GetValue(p1) == 1)
+	        count++;
+
+              if (this->BoundaryPointArray[inputIndex]->GetValue(p2) == 1)
+	        count++;
+
+	      nei=neighbors->GetId(0);
+	      //if cell is not on the boundary, add new cell to check list
+	      if (count < 2)
+	      {
+		//std::cout<<"I have been added by having less than two bps "<<nei<<endl;
+		neiIds->InsertNextId(nei);
+	      }
+	      //if cell is on boundary, check to make sure it isn't 
+	      //false positive; don't add to check list. This is done by
+	      //getting the boundary lines attached to each point, then 
+	      //intersecting the two lists. If the result is zero, then this
+	      //is a false positive
+	      else
+	      {
+		vtkIdType bPt1 = pointMapper[inputIndex][p1];
+		this->IntersectionLines->GetPointCells(bPt1,bLinesOne);
+
+		vtkIdType bPt2 = pointMapper[inputIndex][p2];
+		this->IntersectionLines->GetPointCells(bPt2,bLinesTwo);
+
+		bLinesOne->IntersectWith(bLinesTwo);
+		//Cell is false positive. Add to check list. 
+		if (bLinesOne->GetNumberOfIds() == 0)
+		{
+		  //std::cout<<"I have been added by false positiveness "<<nei<<endl;
+	          //std::cout<<"False positive! "<<nei<<endl;
+		  neiIds->InsertNextId(nei);
+		  this->FalsePositiveArray[inputIndex]->InsertValue(nei,1);
+		}
+		//else
+		  //std::cout<<"I have not been added because false"<<endl;
+	      }
+	    }
+	    else
+	    {
+	      //cout<<"NumNei is not 1"<<endl;
+	      //cout<<"Number of Neighbors "<<numNei<<endl;
+	      //cout<<"Cell is "<<cellId<<endl;
+	      for (k=0;k<numNei;k++)
+	      {
+	        //cout<<"Id!!! "<<neighbors->GetId(k)<<endl;
+	      }
+	    }
+	  }
+
+	  nIds = neiIds->GetNumberOfIds();
+	  if (nIds>0)
+	  {
+	    //Add all Ids in current list to global list of Ids
+	    for (k=0; k< nIds;k++)
+	    {
+		neiId = neiIds->GetId(k);
+		if (this->checkedcarefully[inputIndex][neiId]==0)
+		{
+		  this->CheckCellsCareful2->InsertNextId(neiId);
+		}
+		else if (this->checked[inputIndex][neiId]==0)
+		{
+		  this->CheckCells2->InsertNextId(neiId);
+		}
+	    }
+	  }
+	}
+      }
+
+      //Add current list of checked cells to the full list and continue
+      tmp = this->CheckCellsCareful;
+      this->CheckCellsCareful = this->CheckCellsCareful2;
+      this->CheckCellsCareful2 = tmp;
+      tmp->Reset();
+    }
+    return 1;
+}
+
+void vtkBooleanOperationPolyDataFilterMine::Impl::Initialize()
+{
+  int numPts;
+  int numPolys;
+  for (int i =0;i<2;i++)
+  {
+    if (this->Mesh[i]->GetNumberOfPoints() == 0 ||
+	this->Mesh[i]->GetNumberOfCells() == 0)
+    {
+      //std::cout<<"Mesh has zero points or cells and cannot run filter"<<endl;
+      return;
+    }
+
+    //Get the number of Polys for scalar  allocation
+    numPolys = this->Mesh[i]->GetNumberOfPolys();
+    numPts = this->Mesh[i]->GetNumberOfPoints();
+    
+    //Allocate space for each Boundary Array and the fill array
+    this->BoundaryPointArray[i]->SetNumberOfTuples(numPts);
+    this->BoundaryCellArray[i]->SetNumberOfTuples(numPolys);
+    this->OrientedCellArray[i]->SetNumberOfTuples(numPolys);
+    this->FalsePositiveArray[i]->SetNumberOfTuples(numPolys);
+    this->BooleanArray[i]->SetNumberOfTuples(numPolys);
+    this->checked[i] = new vtkIdType[numPolys];
+    this->checkedcarefully[i] = new vtkIdType[numPolys];
+    this->pointMapper[i] = new vtkIdType[numPolys];
+
+    for (int j=0;j<numPts;j++)
+    {
+      this->BoundaryPointArray[i]->InsertValue(j,0);
+    }
+    for (int j=0;j<numPolys;j++)
+    {
+      this->BoundaryCellArray[i]->InsertValue(j,0);
+      this->OrientedCellArray[i]->InsertValue(j,0);
+      this->FalsePositiveArray[i]->InsertValue(j,0);
+      this->BooleanArray[i]->InsertValue(j,0);
+      this->checked[i][j] = 0;
+      this->checkedcarefully[i][j] = 0;
+      this->pointMapper[i][j] = -1;
+    }
+  }
+  this->NewCellIds[0]->DeepCopy(this->IntersectionLines->GetCellData()->GetArray("NewCell0ID"));
+  this->NewCellIds[1]->DeepCopy(this->IntersectionLines->GetCellData()->GetArray("NewCell1ID"));
+
+}
+
+void vtkBooleanOperationPolyDataFilterMine::Impl::GetBooleanRegions(int inputIndex)
+{
+  int numLoops=0;
+  vtkIdType interPt;
+  vtkIdType nextCell;
+  vtkIdType outputCellId0;
+  vtkIdType outputCellId1;
+  vtkSmartPointer<vtkIdList> cellIds = vtkSmartPointer<vtkIdList>::New();
+
+  bool *usedPt;
+  usedPt = new bool[this->IntersectionLines->GetNumberOfPoints()];
+  for (interPt=0;interPt<this->IntersectionLines->GetNumberOfPoints();interPt++)
+  {
+    usedPt[interPt] = false;
+  }
+
+  for (interPt=0;interPt<this->IntersectionLines->GetNumberOfPoints();interPt++)
+  {
+    if (usedPt[interPt] == false)
+    {
+      usedPt[interPt] = true;
+      this->IntersectionLines->GetPointCells(interPt,cellIds);
+      if (cellIds->GetNumberOfIds() > 2)
+	std::cout<<"Number Of Cells is greater than 2 for first point "<<interPt<<endl;
+      else if (cellIds->GetNumberOfIds() < 2)
+        std::cout<<"Number Of Cells is less than 2 for point "<<interPt<<endl;
+      //if (numLoops == 0)
+        nextCell = cellIds->GetId(0);
+      //else
+      //  nextCell = cellIds->GetId(1);
+      this->OrientSingleLoop(inputIndex,interPt,nextCell,usedPt);
+      numLoops++;
+    }
+  }
+  std::cout<<"Number Of Loops: "<<numLoops<<endl;
+  delete [] usedPt;
+}
+
+void vtkBooleanOperationPolyDataFilterMine::Impl::OrientSingleLoop(int inputIndex, 
+    vtkIdType interPt,vtkIdType nextCell,bool *usedPt)
+{
+  vtkIdType prevPt;
+  vtkIdType nextPt = interPt;
+  vtkIdType startPt = interPt;
+  vtkIdType outputCellId0;
+  vtkIdType outputCellId1;
+  vtkSmartPointer<vtkIdList> pointIds = vtkSmartPointer<vtkIdList>::New();
+  vtkSmartPointer<vtkIdList> cellIds = vtkSmartPointer<vtkIdList>::New();
+  vtkSmartPointer<vtkPolyData> tmpPolyData = vtkSmartPointer<vtkPolyData>::New();
+  tmpPolyData->DeepCopy(this->Mesh[inputIndex]);
+  tmpPolyData->BuildLinks();
+
+  IntersectionLines->GetCellPoints(nextCell,pointIds);
+  if (pointIds->GetNumberOfIds() > 2)
+    std::cout<<"Number Of Points is greater than 2 for first cell "<<nextCell<<endl;
+  else if (pointIds->GetNumberOfIds() < 2)
+    std::cout<<"Number Of Points is less than 2 for first cell "<<nextCell<<endl;
+
+
+  if (pointIds->GetId(0) == nextPt)
+    nextPt = pointIds->GetId(1);
+  else
+    nextPt = pointIds->GetId(0);
+
+//  std::cout<<"Next Cell is "<<nextCell<<endl;
+  outputCellId0 = this->NewCellIds[inputIndex]->GetComponent(nextCell,0);
+  outputCellId1 = this->NewCellIds[inputIndex]->GetComponent(nextCell,1);
+  double pt0[3],pt1[3];
+  IntersectionLines->GetPoint(startPt,pt0); 
+  IntersectionLines->GetPoint(nextPt,pt1);
+  if (this->checkedcarefully[inputIndex][outputCellId0] == 0)
+  {
+    int sign1 = this->GetCellOrientation(tmpPolyData,outputCellId0,
+      pt0,pt1,inputIndex);
+    if (sign1 != 0)
+    {
+      this->CheckCells->InsertNextId(outputCellId0);
+      this->FindRegion(inputIndex,sign1,1);
+      this->CheckCells->Reset();
+      this->CheckCells2->Reset();
+      this->CheckCellsCareful->Reset();
+      this->CheckCellsCareful2->Reset();
+    }
+    this->OrientedCellArray[inputIndex]->InsertValue(outputCellId0,sign1);
+  }
+  if (this->checkedcarefully[inputIndex][outputCellId1] == 0)
+  {
+    int sign2 = this->GetCellOrientation(tmpPolyData,outputCellId1,
+	pt0,pt1,inputIndex);
+    if (sign2 != 0)
+    {
+      this->FindRegion(inputIndex,sign2,1);
+      this->CheckCells->Reset();
+      this->CheckCells2->Reset();
+      this->CheckCellsCareful->Reset();
+      this->CheckCellsCareful2->Reset();
+    }
+    this->OrientedCellArray[inputIndex]->InsertValue(outputCellId1,sign2);
+  }
+  //std::cout<<"Cell vals "<<outputCellId0<<" "<<outputCellId1<<endl;
+
+  usedPt[nextPt] = true;
+  //std::cout<<"Next Point is "<<nextPt<<endl;
+
+  while(nextPt != startPt)
+  {
+    IntersectionLines->GetPointCells(nextPt,cellIds);
+    if (cellIds->GetNumberOfIds() > 2)
+      std::cout<<"Number Of Cells is greater than 2 for point "<<nextPt<<endl;
+    else if (cellIds->GetNumberOfIds() < 2)
+      std::cout<<"Number Of Cells is less than 2 for point "<<nextPt<<endl;
+    if (cellIds->GetId(0) == nextCell)
+      nextCell = cellIds->GetId(1);
+    else
+      nextCell = cellIds->GetId(0);
+
+    IntersectionLines->GetCellPoints(nextCell,pointIds);
+    if (pointIds->GetNumberOfIds() > 2)
+      std::cout<<"Number Of Points is greater than 2 for cell "<<nextCell<<endl;
+    else if (pointIds->GetNumberOfIds() < 2)
+      std::cout<<"Number Of Points is less than 2 for first cell "<<nextCell<<endl;
+    prevPt = nextPt;
+    if (pointIds->GetId(0) == nextPt)
+      nextPt = pointIds->GetId(1);
+    else
+      nextPt = pointIds->GetId(0);
+    usedPt[nextPt] = true;
+    outputCellId0 = this->NewCellIds[inputIndex]->GetComponent(nextCell,0);
+    outputCellId1 = this->NewCellIds[inputIndex]->GetComponent(nextCell,1);
+    IntersectionLines->GetPoint(prevPt,pt0); 
+    IntersectionLines->GetPoint(nextPt,pt1);
+    if (this->checkedcarefully[inputIndex][outputCellId0] == 0)
+    {
+      int sign1 = this->GetCellOrientation(tmpPolyData,outputCellId0,
+	pt0,pt1,inputIndex);
+      if (sign1 != 0)
+      {
+	this->CheckCells->InsertNextId(outputCellId0);
+        this->FindRegion(inputIndex,sign1,1);
+	this->CheckCells->Reset();
+	this->CheckCells2->Reset();
+	this->CheckCellsCareful->Reset();
+	this->CheckCellsCareful2->Reset();
+      }
+      this->OrientedCellArray[inputIndex]->InsertValue(outputCellId0,sign1);
+    }
+    if (this->checkedcarefully[inputIndex][outputCellId1] == 0)
+    {
+      int sign2 = this->GetCellOrientation(tmpPolyData,outputCellId1,
+	  pt0,pt1,inputIndex);
+      if (sign2 != 0)
+      {
+	this->CheckCells->InsertNextId(outputCellId1);
+        this->FindRegion(inputIndex,sign2,1);
+	this->CheckCells->Reset();
+	this->CheckCells2->Reset();
+	this->CheckCellsCareful->Reset();
+	this->CheckCellsCareful2->Reset();
+      }
+      this->OrientedCellArray[inputIndex]->InsertValue(outputCellId1,sign2);
+    }
+  }
+  //std::cout<<"Start and End Point are "<<startPt<<endl;
+}
+
+int vtkBooleanOperationPolyDataFilterMine::Impl::GetCellOrientation(vtkPolyData *pd,vtkIdType cellId, double pt0[3], double pt1[3],
+    int index)
+{
+  vtkIdType npts;
+  vtkIdType *pts;
+  double tmp[3],pt2[3];
+    //std::cout<<"CELL!!!! "<<cellId<<endl;
+    pd->BuildLinks();
+  pd->GetCellPoints(cellId,npts,pts);
+    //std::cout<<"After points"<<endl;
+  vtkSmartPointer<vtkPoints> cellPts = 
+    vtkSmartPointer<vtkPoints>::New();
+  vtkSmartPointer<vtkPolyData> cellPD = 
+    vtkSmartPointer<vtkPolyData>::New();
+  vtkSmartPointer<vtkCellArray> cellLines = 
+    vtkSmartPointer<vtkCellArray>::New();
+  //pt0Id and pt1Id are from intersectionLines PolyData and I am trying
+  //to compare these to the point ids in pd. They are different. Figure out a way
+  //to compare these efficiently.
+  double points[3][3];
+  for (int j=0;j<npts;j++)
+  {
+    pd->GetPoint(pts[j],tmp);
+    if(!(tmp[0] == pt0[0] &&  tmp[1] == pt0[1] && tmp[2] == pt0[2]) &&
+       !(tmp[0] == pt1[0] &&  tmp[1] == pt1[1] && tmp[2] == pt1[2]))
+    {
+      for (int k=0;k<npts;k++)
+      {
+        pt2[k] = tmp[k];
+      }
+    }
+    for (int k=0;k<npts;k++)
+    {
+      points[j][k] = tmp[k];
+    }
+  }
+  cellPts->InsertNextPoint(pt0);
+  cellPts->InsertNextPoint(pt1);
+  cellPts->InsertNextPoint(pt2);
+  cellPD->SetPoints(cellPts);
+  for (int j=0;j<npts;j++)
+  {
+    int spot1 = j;
+    int spot2 = (j+1)%3;
+    cellLines->InsertNextCell(2);
+    cellLines->InsertCellPoint(spot1);
+    cellLines->InsertCellPoint(spot2);
+  }
+  cellPD->SetLines(cellLines);
+
+  // Set up a transform that will rotate the points to the
+  // XY-plane (normal aligned with z-axis).
+  vtkSmartPointer< vtkTransform > transform =
+    vtkSmartPointer< vtkTransform >::New();
+  double zaxis[3] = {0, 0, 1};
+  double rotationAxis[3], normal[3], center[3], rotationAngle;
+
+  vtkTriangle::ComputeNormal(points[0], points[1], points[2], normal);
+
+  double dotZAxis = vtkMath::Dot( normal, zaxis );
+  if ( fabs(1.0 - dotZAxis) < 1e-6 )
+    {
+    // Aligned with z-axis
+    rotationAxis[0] = 1.0;
+    rotationAxis[1] = 0.0;
+    rotationAxis[2] = 0.0;
+    rotationAngle = 0.0;
+    }
+  else if ( fabs( 1.0 + dotZAxis ) < 1e-6 )
+    {
+    // Co-linear with z-axis, but reversed sense.
+    // Aligned with z-axis
+    rotationAxis[0] = 1.0;
+    rotationAxis[1] = 0.0;
+    rotationAxis[2] = 0.0;
+    rotationAngle = 180.0;
+    }
+  else
+    {
+    // The general case
+    vtkMath::Cross(normal, zaxis, rotationAxis);
+    vtkMath::Normalize(rotationAxis);
+    rotationAngle =
+      vtkMath::DegreesFromRadians(acos(vtkMath::Dot(zaxis, normal)));
+    }
+
+  transform->PreMultiply();
+  transform->Identity();
+
+  //std::cout<<"ROTATION ANGLE "<<rotationAngle<<endl;
+  //std::cout<<"ROTATION AXIS "<<rotationAxis[0]<<" "<<rotationAxis[1]<<" "<<rotationAxis[2]<<endl;
+  transform->RotateWXYZ(rotationAngle,
+                        rotationAxis[0],
+                        rotationAxis[1],
+                        rotationAxis[2]);
+
+  vtkTriangle::TriangleCenter(points[0], points[1], points[2], center);
+  transform->Translate(-center[0], -center[1], -center[2]);
+
+  vtkSmartPointer<vtkTransformPolyDataFilter> transformer = 
+    vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+  transformer->SetInputData(cellPD);
+  transformer->SetTransform(transform);
+  transformer->Update();
+
+  vtkSmartPointer<vtkPolyData> transPD = 
+    vtkSmartPointer<vtkPolyData>::New();
+  transPD = transformer->GetOutput();
+//  WriteVTPFile(cellPD,"PreOrientCell_"+int2String(index)+"_"+int2String(cellId));
+//  WriteVTPFile(transPD,"OrientCell_"+int2String(index)+"_"+int2String(cellId));
+
+  double area = 0;
+  double tedgept1[3];
+  double tedgept2[3];
+  vtkIdType newpt;
+  for(newpt=0;newpt<transPD->GetNumberOfPoints()-1;newpt++)
+  {
+      transPD->GetPoint(newpt,tedgept1);
+      //std::cout<<"Trans Point"<<newpt<<" is: "<<tedgept1[0]<<" "<<tedgept1[1]<<" "<<tedgept1[2]<<endl;
+      transPD->GetPoint(newpt+1,tedgept2);
+      area = area + (tedgept1[0]*tedgept2[1])-(tedgept2[0]*tedgept1[1]);
+      //area = area + (tedgept2[0]-tedgept1[0])*(tedgept2[1]+tedgept1[1]);
+  }
+  transPD->GetPoint(newpt,tedgept1);
+  //std::cout<<"Trans Point"<<newpt<<" is: "<<tedgept1[0]<<" "<<tedgept1[1]<<" "<<tedgept1[2]<<endl;
+  transPD->GetPoint(0,tedgept2);
+  area = area + (tedgept1[0]*tedgept2[1])-(tedgept2[0]*tedgept1[1]);
+  //area = area + (tedgept2[0]-tedgept1[0])*(tedgept2[1]+tedgept1[1]);
+
+  int value=0;
+  double tolerance = 1e-6;
+  if (area < 0 && fabs(area) > tolerance)
+  {
+    //std::cout<<"AREA IS NEGATIVE "<<area<<endl;
+    value = -1;
+  }
+  else if (area > 0 && fabs(area) > tolerance)
+  {
+    //std::cout<<"AREA IS "<<area<<endl;
+    value = 1;
+  }
+  else 
+  {
+    value = 0;
+  }
+
+  return value;
+}
+
+void vtkBooleanOperationPolyDataFilterMine::Impl::SetBoundaryArrays()
+{
+
+  //Variables used in the function
+  double pt[3];
+  vtkIdType pointId,bp1,bp2,i;
+  vtkSmartPointer<vtkIdList> bpCellIds1 = 
+    vtkSmartPointer<vtkIdList>::New();
+  vtkSmartPointer<vtkIdList> bpCellIds2 = 
+    vtkSmartPointer<vtkIdList>::New();
+  //Point locator to find points on mesh that are the points on the boundary
+  //lines
+  vtkSmartPointer<vtkPointLocator> pointLocator1 = 
+    vtkSmartPointer<vtkPointLocator>::New();
+  vtkSmartPointer<vtkPointLocator> pointLocator2 = 
+    vtkSmartPointer<vtkPointLocator>::New();
+  pointLocator1->SetDataSet(this->Mesh[0]);
+  pointLocator1->BuildLocator();
+  pointLocator2->SetDataSet(this->Mesh[1]);
+  pointLocator2->BuildLocator();
+
+  for (pointId = 0;pointId < this->IntersectionLines->GetNumberOfPoints();pointId++)
+  {
+    this->IntersectionLines->GetPoint(pointId,pt);
+    //Find point on mesh 
+    bp1 = pointLocator1->FindClosestPoint(pt);
+    this->pointMapper[0][bp1] = pointId;
+    this->BoundaryPointArray[0]->InsertValue(bp1,1);
+    this->Mesh[0]->GetPointCells(bp1,bpCellIds1);
+    //Set the point mapping array
+    //Assign each cell attached to this point as a boundary cell
+    for (i = 0;i < bpCellIds1->GetNumberOfIds();i++)
+    { 
+      this->BoundaryCellArray[0]->InsertValue(bpCellIds1->GetId(i),1);
+      this->checked[0][bpCellIds1->GetId(i)] = 1;
+    }
+
+    bp2 = pointLocator2->FindClosestPoint(pt);
+    this->pointMapper[1][bp2] = pointId;
+    this->BoundaryPointArray[1]->InsertValue(bp2,1);
+    this->Mesh[1]->GetPointCells(bp2,bpCellIds2);
+    //Set the point mapping array
+    //Assign each cell attached to this point as a boundary cell
+    for (i = 0;i < bpCellIds2->GetNumberOfIds();i++)
+    { 
+      this->BoundaryCellArray[1]->InsertValue(bpCellIds2->GetId(i),1);
+      this->checked[1][bpCellIds2->GetId(i)] = 1;
+    }
+  }
+}
+
+void vtkBooleanOperationPolyDataFilterMine::Impl::SetCheckArrays()
+{
+  int numPts;
+  int numPolys;
+  for (int i =0;i<2;i++)
+  {
+    //Get the number of Polys for scalar  allocation
+    numPolys = this->Mesh[i]->GetNumberOfPolys();
+    numPts = this->Mesh[i]->GetNumberOfPoints();
+
+    for (int j=0;j < numPolys;j++)
+    {
+      if (checked[i][j] == 0)
+	this->checkedcarefully[i][j] = 1;
+      else
+	this->checkedcarefully[i][j] = 0;
+    }
+  }
+}
+//---------------------------------------------------------------------------
+
+vtkStandardNewMacro(vtkBooleanOperationPolyDataFilterMine);
+
+//-----------------------------------------------------------------------------
+vtkBooleanOperationPolyDataFilterMine::vtkBooleanOperationPolyDataFilterMine() :
+  vtkPolyDataAlgorithm()
+{
+  this->Operation = VTK_UNION;
+
+  this->SetNumberOfInputPorts(2);
+  this->SetNumberOfOutputPorts(2);
+
+}
+
+//-----------------------------------------------------------------------------
+vtkBooleanOperationPolyDataFilterMine::~vtkBooleanOperationPolyDataFilterMine()
+{
+}
+
+//-----------------------------------------------------------------------------
+int vtkBooleanOperationPolyDataFilterMine::RequestData(vtkInformation*        vtkNotUsed(request),
+                                                   vtkInformationVector** inputVector,
+                                                   vtkInformationVector*  outputVector)
+{
+  vtkInformation* inInfo0 = inputVector[0]->GetInformationObject(0);
+  vtkInformation* inInfo1 = inputVector[1]->GetInformationObject(0);
+  vtkInformation* outInfo0 = outputVector->GetInformationObject(0);
+  vtkInformation* outInfo1 = outputVector->GetInformationObject(1);
+
+  if (!inInfo0 || !inInfo1 || !outInfo0 || !outInfo1)
+    {
+    return 0;
+    }
+
+  vtkPolyData* input0 =
+    vtkPolyData::SafeDownCast(inInfo0->Get(vtkDataObject::DATA_OBJECT()));
+  vtkPolyData* input1 =
+    vtkPolyData::SafeDownCast(inInfo1->Get(vtkDataObject::DATA_OBJECT()));
+
+  vtkPolyData* outputSurface =
+    vtkPolyData::SafeDownCast(outInfo0->Get(vtkDataObject::DATA_OBJECT()));
+  vtkPolyData* outputIntersection =
+    vtkPolyData::SafeDownCast(outInfo1->Get(vtkDataObject::DATA_OBJECT()));
+
+  if (!input0 || !input1 || !outputSurface || !outputIntersection)
+    {
+    return 0;
+    }
+
+  // Get intersected versions
+  vtkSmartPointer<vtkIntersectionPolyDataFilterMine> PolyDataIntersection =
+    vtkSmartPointer<vtkIntersectionPolyDataFilterMine>::New();
+  PolyDataIntersection->SetInputConnection
+    (0, this->GetInputConnection(0, 0));
+  PolyDataIntersection->SetInputConnection
+    (1, this->GetInputConnection(1, 0));
+  PolyDataIntersection->SplitFirstOutputOn();
+  PolyDataIntersection->SplitSecondOutputOn();
+  PolyDataIntersection->Update();
+
+  cout<<"Intersection is Done!!!"<<endl;
+
+//  outputIntersection->CopyStructure(PolyDataIntersection->GetOutput());
+//  outputIntersection->GetPointData()->PassData(PolyDataIntersection->GetOutput()->GetPointData());
+//  outputIntersection->GetCellData()->PassData(PolyDataIntersection->GetOutput()->GetCellData());
+
+  WriteVTP(PolyDataIntersection->GetOutput(0),"IntersectionLines");
+  WriteVTP(PolyDataIntersection->GetOutput(1),"IntersectionObject1");
+  WriteVTP(PolyDataIntersection->GetOutput(2),"IntersectionObject2");
+
+  vtkBooleanOperationPolyDataFilterMine::Impl *impl = 
+    new vtkBooleanOperationPolyDataFilterMine::Impl();
+  impl->Mesh[0]->DeepCopy(PolyDataIntersection->GetOutput(1));
+  impl->Mesh[0]->BuildLinks();
+  impl->Mesh[1]->DeepCopy(PolyDataIntersection->GetOutput(2));
+  impl->Mesh[1]->BuildLinks();
+  impl->IntersectionLines->DeepCopy(PolyDataIntersection->GetOutput(0));
+
+  std::cout<<"Initializing"<<endl;
+  impl->Initialize();
+  std::cout<<"Setting Bound Arrays"<<endl;
+  impl->SetBoundaryArrays();
+  std::cout<<"Setting Check Arrays"<<endl;
+  impl->SetCheckArrays();
+
+  impl->DetermineIntersection();
+
+  impl->BooleanArray[0]->SetName("BooleanRegion");
+  impl->BooleanArray[1]->SetName("BooleanRegion");
+  impl->Mesh[0]->GetCellData()->AddArray(impl->BooleanArray[0]);
+  impl->Mesh[0]->GetCellData()->SetActiveScalars("BooleanRegion");
+  impl->Mesh[1]->GetCellData()->AddArray(impl->BooleanArray[1]);
+  impl->Mesh[1]->GetCellData()->SetActiveScalars("BooleanRegion");
+
+  impl->BoundaryCellArray[0]->SetName("BoundaryCells");
+  impl->BoundaryCellArray[1]->SetName("BoundaryCells");
+  impl->Mesh[0]->GetCellData()->AddArray(impl->BoundaryCellArray[0]);
+  impl->Mesh[0]->GetCellData()->SetActiveScalars("BoundaryCells");
+  impl->Mesh[1]->GetCellData()->AddArray(impl->BoundaryCellArray[1]);
+  impl->Mesh[1]->GetCellData()->SetActiveScalars("BoundaryCells");
+
+  impl->BoundaryPointArray[0]->SetName("BoundaryPoints");
+  impl->BoundaryPointArray[1]->SetName("BoundaryPoints");
+  impl->Mesh[0]->GetPointData()->AddArray(impl->BoundaryPointArray[0]);
+  impl->Mesh[0]->GetPointData()->SetActiveScalars("BoundaryPoints");
+  impl->Mesh[1]->GetPointData()->AddArray(impl->BoundaryPointArray[1]);
+  impl->Mesh[1]->GetPointData()->SetActiveScalars("BoundaryPoints");
+
+  impl->OrientedCellArray[0]->SetName("OrientedCells");
+  impl->OrientedCellArray[1]->SetName("OrientedCells");
+  impl->Mesh[0]->GetCellData()->AddArray(impl->OrientedCellArray[0]);
+  impl->Mesh[0]->GetCellData()->SetActiveScalars("OrientedCells");
+  impl->Mesh[1]->GetCellData()->AddArray(impl->OrientedCellArray[1]);
+  impl->Mesh[1]->GetCellData()->SetActiveScalars("OrientedCells");
+
+  impl->FalsePositiveArray[0]->SetName("FalsePositive");
+  impl->FalsePositiveArray[1]->SetName("FalsePositive");
+  impl->Mesh[0]->GetCellData()->AddArray(impl->FalsePositiveArray[0]);
+  impl->Mesh[0]->GetCellData()->SetActiveScalars("FalsePositive");
+  impl->Mesh[1]->GetCellData()->AddArray(impl->FalsePositiveArray[1]);
+  impl->Mesh[1]->GetCellData()->SetActiveScalars("FalsePositive");
+
+  WriteVTP(impl->Mesh[0],"Surface0BooleanBefore");
+  WriteVTP(impl->Mesh[1],"Surface1BooleanBefore");
+
+  impl->GetBooleanRegions(0);
+  std::cout<<"DONE WITH 1"<<endl;
+  impl->GetBooleanRegions(1);
+  std::cout<<"DONE WITH 2"<<endl;
+
+  WriteVTP(impl->Mesh[0],"Surface0Boolean");
+  WriteVTP(impl->Mesh[1],"Surface1Boolean");
+
+  vtkSmartPointer<vtkThreshold> thresholder = 
+    vtkSmartPointer<vtkThreshold>::New();
+  vtkSmartPointer<vtkDataSetSurfaceFilter> surfacer = 
+    vtkSmartPointer<vtkDataSetSurfaceFilter>::New();
+
+  vtkSmartPointer<vtkPolyData> surface1_A = 
+	  vtkSmartPointer<vtkPolyData>::New();
+  thresholder->SetInputData(impl->Mesh[0]);
+  thresholder->SetInputArrayToProcess(0,0,0,1,"BooleanRegion");
+  thresholder->ThresholdBetween(-1,-1);
+  thresholder->Update();
+  surfacer->SetInputData(thresholder->GetOutput());
+  surfacer->Update();
+  surface1_A->DeepCopy(surfacer->GetOutput());
+
+  vtkSmartPointer<vtkPolyData> surface1_B = 
+	  vtkSmartPointer<vtkPolyData>::New();
+  thresholder->SetInputData(impl->Mesh[0]);
+  thresholder->SetInputArrayToProcess(0,0,0,1,"BooleanRegion");
+  thresholder->ThresholdBetween(1,1);
+  thresholder->Update();
+  surfacer->SetInputData(thresholder->GetOutput());
+  surfacer->Update();
+  surface1_B->DeepCopy(surfacer->GetOutput());
+
+  vtkSmartPointer<vtkPolyData> surface2_A = 
+	  vtkSmartPointer<vtkPolyData>::New();
+  thresholder->SetInputData(impl->Mesh[1]);
+  thresholder->SetInputArrayToProcess(0,0,0,1,"BooleanRegion");
+  thresholder->ThresholdBetween(1,1);
+  thresholder->Update();
+  surfacer->SetInputData(thresholder->GetOutput());
+  surfacer->Update();
+  surface2_A->DeepCopy(surfacer->GetOutput());
+
+  vtkSmartPointer<vtkPolyData> surface2_B = 
+	  vtkSmartPointer<vtkPolyData>::New();
+  thresholder->SetInputData(impl->Mesh[1]);
+  thresholder->SetInputArrayToProcess(0,0,0,1,"BooleanRegion");
+  thresholder->ThresholdBetween(-1,-1);
+  thresholder->Update();
+  surfacer->SetInputData(thresholder->GetOutput());
+  surfacer->Update();
+  surface2_B->DeepCopy(surfacer->GetOutput());
+  
+  cout<<"Append"<<endl;
+  vtkSmartPointer<vtkAppendPolyData> appender = 
+    vtkSmartPointer<vtkAppendPolyData>::New();
+  
+  if (this->Operation == VTK_UNION)
+  {
+    appender->AddInputData(surface1_A);
+    appender->AddInputData(surface2_A);
+  }
+  if (this->Operation == VTK_INTERSECTION)
+  {
+    appender->AddInputData(surface1_B);
+    appender->AddInputData(surface2_B);
+  }
+  if (this->Operation == VTK_DIFFERENCE)
+  {
+    appender->AddInputData(surface1_A);
+    appender->AddInputData(surface2_B);
+  }
+  appender->Update();
+
+  vtkSmartPointer<vtkCleanPolyData> fullCleaner = 
+	  vtkSmartPointer<vtkCleanPolyData>::New();
+  fullCleaner->SetInputData(appender->GetOutput());
+  fullCleaner->Update();
+  outputSurface->DeepCopy(fullCleaner->GetOutput());
+
+  double badtrirange[2], freeedgerange[2];
+
+  outputSurface->GetCellData()->GetArray("BadTri")->GetRange(badtrirange,0);
+  outputSurface->GetCellData()->GetArray("FreeEdge")->GetRange(freeedgerange,0);
+
+  std::cout<<"BAD TRI MAX: "<<badtrirange[0]<<" MIN: "<<badtrirange[1]<<endl;
+  std::cout<<"FREE EDGE MAX: "<<freeedgerange[0]<<" MIN: "<<freeedgerange[1]<<endl;
+  delete impl;
+  return 1;
+}
+
+//-----------------------------------------------------------------------------
+void vtkBooleanOperationPolyDataFilterMine::PrintSelf(ostream& os, vtkIndent indent)
+{
+  this->Superclass::PrintSelf(os,indent);
+
+  os << indent << "Operation: ";
+  switch ( this->Operation )
+    {
+    case VTK_UNION:
+      os << "UNION";
+      break;
+
+    case VTK_INTERSECTION:
+      os << "INTERSECTION";
+      break;
+
+    case VTK_DIFFERENCE:
+      os << "DIFFERENCE";
+      break;
+    }
+  os << "\n";
+}
+
+//-----------------------------------------------------------------------------
+int vtkBooleanOperationPolyDataFilterMine::FillInputPortInformation(int port, vtkInformation *info)
+{
+  if (!this->Superclass::FillInputPortInformation(port, info))
+    {
+    return 0;
+    }
+  if (port == 0)
+    {
+    info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkPolyData");
+    }
+  else if (port == 1)
+    {
+    info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkPolyData");
+    info->Set(vtkAlgorithm::INPUT_IS_OPTIONAL(), 0);
+    }
+  return 1;
+}
+
+//-----------------------------------------------------------------------------
+
+void vtkBooleanOperationPolyDataFilterMine::Impl::DetermineIntersection()
+{
+  int numLoops=0;
+  int caseId=0;
+  vtkIdType interPt;
+  vtkIdType nextCell;
+  vtkIdType outputCellId0;
+  vtkIdType outputCellId1;
+  vtkSmartPointer<vtkIdList> cellIds = vtkSmartPointer<vtkIdList>::New();
+  bool *usedPt;
+  usedPt = new bool[this->IntersectionLines->GetNumberOfPoints()];
+  for (interPt=0;interPt<this->IntersectionLines->GetNumberOfPoints();interPt++)
+  {
+    usedPt[interPt] = false;
+  }
+
+  for (interPt=0;interPt<this->IntersectionLines->GetNumberOfPoints();interPt++)
+  {
+    if (usedPt[interPt] == false)
+    {
+      usedPt[interPt] = true;
+      this->IntersectionLines->GetPointCells(interPt,cellIds);
+      if (cellIds->GetNumberOfIds() > 2)
+	std::cout<<"Number Of Cells is greater than 2 for first point "<<interPt<<endl;
+      else if (cellIds->GetNumberOfIds() < 2)
+        std::cout<<"Number Of Cells is less than 2 for point "<<interPt<<endl; 
+
+        nextCell = cellIds->GetId(0);
+      caseId = this->RunLoopFind(interPt,nextCell,usedPt);
+      if (caseId != 0)
+      {
+	if (this->intersectionCase == 1)
+	{
+	  int nextPt = caseId;
+	  std::cout<<"Point at junction between intersection edges and containing more than two edges "<<nextPt<<endl;
+	  //Choose next cell in intersectionLines based on angle calculation and run loops to get the rest of the loop
+	}
+	else if (this->intersectionCase == 2)
+	{
+	  int nextPt = caseId;
+	  std::cout<<"End point of open loop is "<<nextPt<<endl;
+	  //Save start and end point in custom data structure for loop
+	}
+      }
+      numLoops++;
+    }
+  }
+  std::cout<<"Number Of Loops: "<<numLoops<<endl;
+
+}
+
+int vtkBooleanOperationPolyDataFilterMine::Impl::RunLoopFind(vtkIdType interPt,vtkIdType nextCell, bool *usedPt)
+{
+  int edgebreak = 0;
+  vtkIdType prevPt;
+  vtkIdType nextPt = interPt;
+  vtkIdType startPt = interPt;
+  vtkIdType outputCellId0;
+  vtkIdType outputCellId1;
+  vtkSmartPointer<vtkIdList> pointIds = vtkSmartPointer<vtkIdList>::New();
+  vtkSmartPointer<vtkIdList> cellIds = vtkSmartPointer<vtkIdList>::New();
+
+  IntersectionLines->GetCellPoints(nextCell,pointIds);
+  if (pointIds->GetNumberOfIds() > 2)
+  {
+    std::cout<<"Number Of Points is greater than 2 for first cell "<<nextCell<<endl;
+    return -1;
+  }
+  else if (pointIds->GetNumberOfIds() < 2)
+  {
+    std::cout<<"Number Of Points is less than 2 for first cell "<<nextCell<<endl;
+    return -1;
+  }
+
+  if (pointIds->GetId(0) == nextPt)
+    nextPt = pointIds->GetId(1);
+  else
+    nextPt = pointIds->GetId(0);
+
+  usedPt[nextPt] = true;
+  while(nextPt != startPt)
+  {
+    IntersectionLines->GetPointCells(nextPt,cellIds);
+    if (cellIds->GetNumberOfIds() > 2)
+    {
+      intersectionCase = 1;
+      std::cout<<"Number Of Cells is greater than 2 for point "<<nextPt<<endl;
+      return nextPt;
+    }
+    else if (cellIds->GetNumberOfIds() < 2)
+    {
+      intersectionCase = 2;
+      std::cout<<"Number Of Cells is less than 2 for point "<<nextPt<<endl;
+      return nextPt;
+    }
+    if (cellIds->GetId(0) == nextCell)
+      nextCell = cellIds->GetId(1);
+    else
+      nextCell = cellIds->GetId(0);
+
+    IntersectionLines->GetCellPoints(nextCell,pointIds);
+    if (pointIds->GetNumberOfIds() > 2)
+      std::cout<<"Number Of Points is greater than 2 for cell "<<nextCell<<endl;
+    else if (pointIds->GetNumberOfIds() < 2)
+      std::cout<<"Number Of Points is less than 2 for first cell "<<nextCell<<endl;
+    prevPt = nextPt;
+    if (pointIds->GetId(0) == nextPt)
+      nextPt = pointIds->GetId(1);
+    else
+      nextPt = pointIds->GetId(0);
+    usedPt[nextPt] = true;
+  }
+  //std::cout<<"Start and End Point are "<<startPt<<endl;
+
+  return 0;
+}
+
