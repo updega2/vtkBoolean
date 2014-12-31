@@ -264,16 +264,7 @@ int vtkIntersectionPolyDataFilterMine::Impl
   vtkIdTypeArray  *intersectionCellIds1  = info->CellIds[1];
   vtkPointLocator *pointMerger           = info->PointMerger;
 
-  static int total0 = 0;
-  static int total1 = 0;
-  static int cpt = 0;
-  static int mypt = 0;
-  static int upt = 0;
-
   int numCells0 = node0->Cells->GetNumberOfIds();
-  total0 += numCells0;
-  //std::cout<<"Number o cells: "<<numCells0<<endl;
-  //std::cout<<"Total0: "<<total0<<endl;
   int retval = 0;
 
   for (vtkIdType id0 = 0; id0 < numCells0; id0++)
@@ -295,8 +286,6 @@ int vtkIntersectionPolyDataFilterMine::Impl
           (node1, triPts0[0], triPts0[1], triPts0[2], transform))
         {
         int numCells1 = node1->Cells->GetNumberOfIds();
-	total1 += numCells1;
-        //std::cout<<"Total1: "<<total1<<endl;
         for (vtkIdType id1 = 0; id1 < numCells1; id1++)
           {
           vtkIdType cellId1 = node1->Cells->GetId(id1);
@@ -357,26 +346,6 @@ int vtkIntersectionPolyDataFilterMine::Impl
 	      check2 = pointMerger->IsInsertedPoint(outpt1);
               unique1 = pointMerger->InsertUniquePoint(outpt0, ptId0);
               unique2 = pointMerger->InsertUniquePoint(outpt1, ptId1);
-
-	      if (check1 == -1) 
-	      {
-		cpt++;
-	        std::cout<<"Point 1 inserted is yes"<<endl;
-	      }
-	      if (check2 == -1)
-	      {
-		cpt++;
-	        std::cout<<"Point 2 inserted is yes"<<endl;
-	      }
-	      if (unique1 == 1 && unique2 == 1) 
-	      {
-		upt++;
-		std::cout<<"Point 1 inserted is yes"<<endl;
-	      }
-	      else if (unique1 == 1 || unique2 == 1)
-	      {
-		upt++;
-	      }
 
 	      int addline = 1;
 	      if (ptId0 == ptId1)
@@ -521,9 +490,6 @@ int vtkIntersectionPolyDataFilterMine::Impl
         }
       }
     }
-  std::cout<<"Number unique pts "<<upt<<endl;
-  std::cout<<"Number check pts "<<cpt<<endl;
-  std::cout<<"Number my pts "<<mypt<<endl;
 
   return retval;
 }
@@ -1336,56 +1302,36 @@ vtkCellArray* vtkIntersectionPolyDataFilterMine::Impl
         del2D->SetTransform(transform);
 	del2D->BoundingTriangulationOff();
 	del2D->Update();
+	polys = del2D->GetOutput()->GetPolys();
 	if (cellId == 371 && inputIndex == 1)
 	{
 	  WriteVTPFile(del2D->GetOutput(),"NewLoopDelaunay"+int2String(cellId)+"_"+int2String(k));
 	}
-
 	vtkSmartPointer<vtkTriangleFilter> triangulator = 
           vtkSmartPointer<vtkTriangleFilter>::New();
-	vtkSmartPointer< vtkDelaunay2D > del2Dxy =
-	  vtkSmartPointer< vtkDelaunay2D >::New();
-	if (del2D->GetOutput()->GetPolys()->GetNumberOfCells() != newpd->GetNumberOfPoints() - 2)
+	if (polys->GetNumberOfCells() != newpd->GetNumberOfPoints() - 2)
 	{
-	  vtkSmartPointer<vtkTransformPolyDataFilter> deltransformer = 
-	    vtkSmartPointer<vtkTransformPolyDataFilter>::New();
-	  vtkSmartPointer<vtkPoints> transpoints = 
-	    vtkSmartPointer<vtkPoints>::New();
-	  vtkSmartPointer<vtkPolyData> transpd = 
-	    vtkSmartPointer<vtkPolyData>::New();
-	  std::cout<<"Del2D failed, transform to xy plane, try again"<<endl;
-	  deltransformer->SetInputData(newpd);
-	  deltransformer->SetTransform(transform);
-	  deltransformer->Update();
-
-	  std::cout<<"Rotation angle "<<rotationAngle<<endl;
-	  double pt[3];
-	  for (vtkIdType i=0;i<deltransformer->GetOutput()->GetNumberOfPoints();i++)
+	  std::cout<<"Delaunay with 0 offset failed, try incrmenting offset"<<endl;
+	  int numoffsets = 1;
+	  while ((polys->GetNumberOfCells() != newpd->GetNumberOfPoints()-2) 
+	      && numoffsets < 20)
 	  {
-	    deltransformer->GetOutput()->GetPoint(i,pt);
-	    for (int j=0;j<2;j++)
-	    {
-	      if (j==0)
-	        pt[j] = round_to_digits(pt[j],2);
-	      else
-	      if (j!=0)
-	        pt[j] = round_to_digits(pt[j],3);
-	    }
-	    pt[2] = 0.;
-	    transpoints->InsertNextPoint(pt);
+	    std::cout<<"Offset: "<<numoffsets<<endl;
+	    vtkSmartPointer< vtkDelaunay2D > del2Doffset =
+	      vtkSmartPointer< vtkDelaunay2D >::New();
+	    del2Doffset->SetInputData(newpd);
+	    del2Doffset->SetSourceData(boundary);
+	    del2Doffset->SetTolerance(0.0);
+	    del2Doffset->SetAlpha(0.0);
+	    del2Doffset->SetOffset(numoffsets);
+            del2Doffset->SetProjectionPlaneMode(VTK_SET_TRANSFORM_PLANE);
+            del2Doffset->SetTransform(transform);
+	    del2Doffset->BoundingTriangulationOff();
+	    del2Doffset->Update();
+
+            polys->DeepCopy(del2Doffset->GetOutput()->GetPolys());
+	    numoffsets++;
 	  }
-	  transpd->SetPoints(transpoints);
-	  transpd->SetLines(newLines);
-
-	  del2Dxy->SetInputData(transpd);
-	  del2Dxy->SetSourceData(transpd);
-	  del2Dxy->SetTolerance(0.0);
-	  del2Dxy->SetAlpha(0.0);
-	  del2Dxy->SetOffset(0);
-	  del2Dxy->BoundingTriangulationOff();
-	  del2Dxy->Update();
-
-          polys = del2Dxy->GetOutput()->GetPolys();
 	  if (polys->GetNumberOfCells() != newpd->GetNumberOfPoints() - 2)
 	  {
 	    std::cout<<"Transform also failed, attempting ear clipping"<<endl;
@@ -1694,6 +1640,10 @@ void vtkIntersectionPolyDataFilterMine::Impl
       {
 	std::cout<<"Tell me that there are more than two cells!"<<endl;
       }
+      else if (pointCells->GetNumberOfIds() < 2)
+      {
+	std::cout<<"Tell me that there are less than two cells!"<<endl;
+      }
       nextCell = pointCells->GetId(0);
       lineBool[nextCell] = true;
       this->GetSingleLoop(pd,&interloop,nextCell,ptBool,lineBool);
@@ -1940,6 +1890,26 @@ void vtkIntersectionPolyDataFilterMine::Impl
       }
       std::cout<<"While looping, point has more than two cells"<<endl;
     }
+    else if (pointCells->GetNumberOfIds() < 2)
+    {
+      vtkSmartPointer<vtkPolyData> currentpd = 
+	vtkSmartPointer<vtkPolyData>::New();
+      vtkSmartPointer<vtkCellArray> currentcells = 
+	vtkSmartPointer<vtkCellArray>::New();
+      std::cout<<"While looping, point has less than two cells"<<endl;
+      currentcells = pd->GetLines();
+      std::cout<<"Number of Cells"<<currentcells->GetNumberOfCells()<<endl;
+      currentcells->InsertNextCell(2);
+      currentcells->InsertCellPoint(nextPt);
+      currentcells->InsertCellPoint(startPt);
+      std::cout<<"Number of Cells"<<currentcells->GetNumberOfCells()<<endl;
+      nextCell = currentcells->GetNumberOfCells()-1;
+      currentpd->SetLines(currentcells);
+      currentpd->SetPoints(pd->GetPoints());
+      pd->DeepCopy(currentpd);
+      pd->BuildLinks();
+      std::cout<<"NewCell added"<<endl;
+    }
     else
     {
       if (pointCells->GetId(0) == nextCell)
@@ -2184,6 +2154,9 @@ int vtkIntersectionPolyDataFilterMine::TriangleTriangleIntersection(double p1[3]
 					double pt1[3], double pt2[3], double surfaceid[2],
 					int &pointCase)
 {
+	static int dumcount = 0;
+	std::cout<<"Dumb count is: "<<dumcount<<endl;
+        dumcount++;
   double n1[3], n2[3];
 
   // Compute supporting plane normals.
@@ -2248,9 +2221,10 @@ int vtkIntersectionPolyDataFilterMine::TriangleTriangleIntersection(double p1[3]
   vtkMath::Cross(n1, n2, v);
   vtkMath::Normalize( v );
 
+  double tol = 1e-10;
   int index1 = 0, index2 = 0;
   double t1[3], t2[3];
-  int ts1,ts2;
+  int ts1=50,ts2=50;
   for (int i = 0; i < 3; i++)
     {
     double t, x[3];
@@ -2259,18 +2233,20 @@ int vtkIntersectionPolyDataFilterMine::TriangleTriangleIntersection(double p1[3]
     // Find t coordinate on line of intersection between two planes.
     if (vtkPlane::IntersectWithLine( pts1[id1], pts1[id2], n2, p2, t, x ))
       {
-	 if (t == 1)
+	 if (t < 1+tol && t > 1-tol)
+	 //if (t == 1)
 	   ts1 = index1;
          t1[index1++] = vtkMath::Dot(x, v) - vtkMath::Dot(p, v);
-      std::cout<<"T val 1 "<<t<<endl;
+         std::cout<<"T val 1 "<<t<<endl;
       }
 
     if (vtkPlane::IntersectWithLine( pts2[id1], pts2[id2], n1, p1, t, x ))
       {
-	if (t == 1)
+	if (t < 1+tol && t > t-tol)
+	//if (t == 1)
 	  ts2 = index2;
         t2[index2++] = vtkMath::Dot(x, v) - vtkMath::Dot(p, v);
-      std::cout<<"T val 2 "<<t<<endl;
+        std::cout<<"T val 2 "<<t<<endl;
       }
     }
 
@@ -2280,11 +2256,13 @@ int vtkIntersectionPolyDataFilterMine::TriangleTriangleIntersection(double p1[3]
    std::cout<<"Index 1 "<<index1<<" and Index 2 "<<index2<<endl;
   if ( index1 > 2)
   {
+    std::cout<<"ts1 "<<ts1<<endl;
     double tmp;
     index1--;
     tmp = t1[ts1];
     t1[ts1] = t1[2];
     t1[2] = tmp;
+    std::cout<<"NOOO"<<endl;
   } 
   if ( index2 > 2)
   {
@@ -2517,6 +2495,7 @@ int vtkIntersectionPolyDataFilterMine::RequestData(vtkInformation*        vtkNot
     (obbTree1, 0, vtkIntersectionPolyDataFilterMine::Impl::FindTriangleIntersections,
      impl);
 
+  std::cout<<"Done with finding intersection lines"<<endl;
   for (int i=0;i<2;i++)
   {
     for (vtkIdType interCellId=0;interCellId<outputIntersection->GetNumberOfLines();interCellId++)
