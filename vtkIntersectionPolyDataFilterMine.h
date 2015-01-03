@@ -66,6 +66,9 @@ public:
                                           int &coplanar, double pt1[3], double pt2[3],
 					  double surfaceid[2], int &pointCase);
 
+  static void CleanAndCheckSurface(vtkPolyData *pd);
+
+
 protected:
   vtkIntersectionPolyDataFilterMine();
   ~vtkIntersectionPolyDataFilterMine();

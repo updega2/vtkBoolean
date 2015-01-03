@@ -494,63 +494,6 @@ int vtkIntersectionPolyDataFilterMine::Impl
   return retval;
 }
 
-void vtkIntersectionPolyDataFilterMine::Impl
-::CleanAndCheckSurface(vtkPolyData *pd)
-{
-  vtkIdType npts,p0,p1;
-  vtkIdType *pts;
-  int badcell = 0;
-  int freeedgecell = 0;
-  vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
-  vtkSmartPointer<vtkIntArray> bad = vtkSmartPointer<vtkIntArray>::New();
-  vtkSmartPointer<vtkIntArray> freeedge = vtkSmartPointer<vtkIntArray>::New();
-  vtkSmartPointer<vtkIdList> edgeneigh = vtkSmartPointer<vtkIdList>::New();
-
-  //Clean the input surface
-  cleaner->SetInputData(pd);
-  cleaner->Update();
-  pd->DeepCopy(cleaner->GetOutput());
-  pd->BuildLinks();
-
-  //Loop through the surface and find edges with cells that have either more 
-  //than one neighbor or no neighbors. No neighbors can be okay,as this can 
-  //indicate a free edge. However, for a polydata surface, multiple neighbors 
-  //indicates a bad cell with possible intersecting facets!
-  for (int i = 0;i<pd->GetNumberOfCells();i++)
-  {
-    pd->GetCellPoints(i,npts,pts);
-    badcell = 0;
-    freeedgecell = 0;
-    for (int j=0;j<npts;j++)
-    {
-      p0 = pts[j];
-      p1 = pts[(j+1)%npts];
-
-      pd->GetCellEdgeNeighbors(i,p0,p1,edgeneigh);
-      if (edgeneigh->GetNumberOfIds() > 1)
-      {
-	badcell = badcell + 1;
-	std::cout<<"Cell on first surface has more than one!!: Numba "<<edgeneigh->GetNumberOfIds()<<" for cell "<<i<<endl;
-      }
-      else if (edgeneigh->GetNumberOfIds() < 1)
-      {
-	freeedgecell = freeedgecell + 1;
-	std::cout<<"Cell on first surface has a free edge for cell "<<i<<endl;
-      }
-
-    }
-    bad->InsertValue(i,badcell);
-    freeedge->InsertValue(i,freeedgecell);
-  }
-
-  bad->SetName("BadTri");
-  pd->GetCellData()->AddArray(bad);
-  pd->GetCellData()->SetActiveScalars("BadTri");
-
-  freeedge->SetName("FreeEdge");
-  pd->GetCellData()->AddArray(freeedge);
-  pd->GetCellData()->SetActiveScalars("FreeEdge");
-}
 
 //----------------------------------------------------------------------------
 int vtkIntersectionPolyDataFilterMine::Impl
@@ -1176,7 +1119,7 @@ vtkCellArray* vtkIntersectionPolyDataFilterMine::Impl
     transformer->Update();
     transformedpd = transformer->GetOutput();
     transformedpd->BuildLinks();
-    //WriteVTPFile(transformedpd,"TransformedCell_"+int2String(cellId));
+   // WriteVTPFile(transformedpd,"TransformedCell_"+int2String(cellId));
 
     //WriteVTPFile(fullpd,"FullCell"+int2String(cellId));
     //WriteVTPFile(interpd,"InterceptCell"+int2String(cellId));
@@ -1285,7 +1228,7 @@ vtkCellArray* vtkIntersectionPolyDataFilterMine::Impl
 	vtkSmartPointer<vtkPolyData> boundary = vtkSmartPointer<vtkPolyData>::New();
 	vtkSmartPointer<vtkPolygon> boundaryPoly = vtkSmartPointer<vtkPolygon>::New();
 	this->Orient(newpd,transform,boundary,boundaryPoly);
-	if (cellId == 371 && inputIndex == 1)
+	if (cellId == 5 && inputIndex == 0)
 	{
           WriteVTPFile(newpd,"PreDelaunay"+int2String(cellId)+"_"+int2String(k));
         //  //WriteVTPFile(boundary,"PreDelaunayBoundary"+int2String(cellId)+"_"+int2String(k));
@@ -1303,7 +1246,7 @@ vtkCellArray* vtkIntersectionPolyDataFilterMine::Impl
 	del2D->BoundingTriangulationOff();
 	del2D->Update();
 	polys = del2D->GetOutput()->GetPolys();
-	if (cellId == 371 && inputIndex == 1)
+	if (cellId == 5 && inputIndex == 0)
 	{
 	  WriteVTPFile(del2D->GetOutput(),"NewLoopDelaunay"+int2String(cellId)+"_"+int2String(k));
 	}
@@ -1343,7 +1286,7 @@ vtkCellArray* vtkIntersectionPolyDataFilterMine::Impl
 	      std::cout<<"Clipping also failed :("<<endl;
 	    }
 	  }
-	  if (cellId == 371 && inputIndex == 1)
+	  if (cellId == 433 && inputIndex == 1)
 	  {
 	    WriteVTPFile(triangulator->GetOutput(),"NewLoopEarClip"+int2String(cellId)+"_"+int2String(k));
 	  }
@@ -2242,7 +2185,7 @@ int vtkIntersectionPolyDataFilterMine::TriangleTriangleIntersection(double p1[3]
 
     if (vtkPlane::IntersectWithLine( pts2[id1], pts2[id2], n1, p1, t, x ))
       {
-	if (t < 1+tol && t > t-tol)
+	if (t < 1+tol && t > 1-tol)
 	//if (t == 1)
 	  ts2 = index2;
         t2[index2++] = vtkMath::Dot(x, v) - vtkMath::Dot(p, v);
@@ -2362,6 +2305,63 @@ int vtkIntersectionPolyDataFilterMine::TriangleTriangleIntersection(double p1[3]
   pt2[2] = p[2] + tt2*v[2];
 
   return 1;
+}
+
+void vtkIntersectionPolyDataFilterMine::CleanAndCheckSurface(vtkPolyData *pd)
+{
+  vtkIdType npts,p0,p1;
+  vtkIdType *pts;
+  int badcell = 0;
+  int freeedgecell = 0;
+  vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
+  vtkSmartPointer<vtkIntArray> bad = vtkSmartPointer<vtkIntArray>::New();
+  vtkSmartPointer<vtkIntArray> freeedge = vtkSmartPointer<vtkIntArray>::New();
+  vtkSmartPointer<vtkIdList> edgeneigh = vtkSmartPointer<vtkIdList>::New();
+
+  //Clean the input surface
+  cleaner->SetInputData(pd);
+  cleaner->Update();
+  pd->DeepCopy(cleaner->GetOutput());
+  pd->BuildLinks();
+
+  //Loop through the surface and find edges with cells that have either more 
+  //than one neighbor or no neighbors. No neighbors can be okay,as this can 
+  //indicate a free edge. However, for a polydata surface, multiple neighbors 
+  //indicates a bad cell with possible intersecting facets!
+  for (int i = 0;i<pd->GetNumberOfCells();i++)
+  {
+    pd->GetCellPoints(i,npts,pts);
+    badcell = 0;
+    freeedgecell = 0;
+    for (int j=0;j<npts;j++)
+    {
+      p0 = pts[j];
+      p1 = pts[(j+1)%npts];
+
+      pd->GetCellEdgeNeighbors(i,p0,p1,edgeneigh);
+      if (edgeneigh->GetNumberOfIds() > 1)
+      {
+	badcell = badcell + 1;
+	//std::cout<<"Cell on first surface has more than one!!: Numba "<<edgeneigh->GetNumberOfIds()<<" for cell "<<i<<endl;
+      }
+      else if (edgeneigh->GetNumberOfIds() < 1)
+      {
+	freeedgecell = freeedgecell + 1;
+	//std::cout<<"Cell on first surface has a free edge for cell "<<i<<endl;
+      }
+
+    }
+    bad->InsertValue(i,badcell);
+    freeedge->InsertValue(i,freeedgecell);
+  }
+
+  bad->SetName("BadTri");
+  pd->GetCellData()->AddArray(bad);
+  pd->GetCellData()->SetActiveScalars("BadTri");
+
+  freeedge->SetName("FreeEdge");
+  pd->GetCellData()->AddArray(freeedge);
+  pd->GetCellData()->SetActiveScalars("FreeEdge");
 }
 
 //----------------------------------------------------------------------------
@@ -2540,7 +2540,7 @@ int vtkIntersectionPolyDataFilterMine::RequestData(vtkInformation*        vtkNot
     impl->BoundaryPoints[0]->SetName("BoundaryPoint");
     //outputPolyData0->GetPointData()->AddArray(impl->BoundaryPoints[0]);
     //outputPolyData0->GetPointData()->SetActiveScalars("BoundaryPoint");
-    impl->CleanAndCheckSurface(outputPolyData0);
+    CleanAndCheckSurface(outputPolyData0);
     outputPolyData0->BuildLinks();
     }
   else
@@ -2556,7 +2556,7 @@ int vtkIntersectionPolyDataFilterMine::RequestData(vtkInformation*        vtkNot
     impl->BoundaryPoints[1]->SetName("BoundaryPoint");
     //outputPolyData1->GetPointData()->AddArray(impl->BoundaryPoints[1]);
     //outputPolyData1->GetPointData()->SetActiveScalars("BoundaryPoint");
-    impl->CleanAndCheckSurface(outputPolyData1);
+    CleanAndCheckSurface(outputPolyData1);
     outputPolyData1->BuildLinks();
     }
   else

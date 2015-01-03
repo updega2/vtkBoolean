@@ -20,13 +20,10 @@
 #include "vtkXMLPolyDataWriter.h"
 #include "vtkXMLUnstructuredGridWriter.h"
 #include "vtkDistancePolyDataFilter.h"
-#ifdef USE_MINE
-	#include "vtkIntersectionPolyDataFilterMine.h"
-	#include "vtkBooleanOperationPolyDataFilterMine.h"
-#else
-	#include "vtkIntersectionPolyDataFilter.h"
-	#include "vtkBooleanOperationPolyDataFilter.h"
-#endif
+#include "vtkIntersectionPolyDataFilterMine.h"
+#include "vtkBooleanOperationPolyDataFilterMine.h"
+#include "vtkIntersectionPolyDataFilter.h"
+#include "vtkBooleanOperationPolyDataFilter.h"
 #include "vtkPolyData.h"
 #include "vtkDataArray.h"
 #include "vtkIntArray.h"
@@ -218,8 +215,23 @@ int main(int argc, char *argv[])
     myBoolean->SetOperationToDifference();
 
   myBoolean->Update();
+  vtkSmartPointer<vtkPolyData> fullpd = 
+	  vtkSmartPointer<vtkPolyData>::New();
+  fullpd->DeepCopy(myBoolean->GetOutput());
 
-  WriteVTPFile(inputFilename1,myBoolean->GetOutput(),"_FullBoolean");
+  fullpd->GetCellData()->RemoveArray("BadTri");
+  fullpd->GetCellData()->RemoveArray("FreeEdge");
+
+  vtkIntersectionPolyDataFilterMine::CleanAndCheckSurface(fullpd);
+  double fullbadtri[2], fullfreeedge[2];
+  fullpd->GetCellData()->GetArray("BadTri")->GetRange(fullbadtri,0);
+  fullpd->GetCellData()->GetArray("FreeEdge")->GetRange(fullfreeedge,0);
+
+  std::cout<<"FULL SURFACE BAD TRI MIN: "<<fullbadtri[0]<<" MAX: "<<fullbadtri[1]<<endl;
+  std::cout<<"FULL SURFACE FREE EDGE MIN: "<<fullfreeedge[0]<<" MAX: "<<fullfreeedge[1]<<endl;
+
+
+  WriteVTPFile(inputFilename1,fullpd,"_FullBoolean");
   //Exit the program without errors
   return EXIT_SUCCESS;
 }
