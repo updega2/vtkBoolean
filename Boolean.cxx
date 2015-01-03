@@ -1,8 +1,8 @@
 //
-//  Intersect.cxx
+//  Boolean.cxx
 //  
 //
-//  Created by Adam Updegrove on 10/4/14.
+//  Created by Adam Updegrove on 12/17/14.
 //
 //
 
@@ -18,7 +18,8 @@
 #include "vtkXMLUnstructuredGridWriter.h"
 #include "vtkDistancePolyDataFilter.h"
 #include "vtkIntersectionPolyDataFilterMine.h"
-#include "vtkIntersectionPolyDataFilter.h"
+#include "vtkBooleanOperationPolyDataFilterMine.h"
+#include "vtkBooleanOperationPolyDataFilter.h"
 #include "vtkPolyData.h"
 #include "vtkDataArray.h"
 #include "vtkIntArray.h"
@@ -110,26 +111,28 @@ void WriteVTPFile(std::string inputFilename,vtkPolyData *writePolyData,std::stri
 
 int main(int argc, char *argv[])
 {
-  if (argc != 3)
+  if (argc != 4)
   {
-      std::cout << "Input Filenames Required!" <<endl;
+      std::cout << "Input Filenames Required, Need Boolean!" <<endl;
       return EXIT_FAILURE;
   }
 
   //Create string from input File Name on command line
   std::string inputFilename1 = argv[1];
   std::string inputFilename2 = argv[2];
+  int op = (int) (argv[3][0] - '0');
                                                                              
   //Create pointers for reading the STL, creating the full unstructured grid,
   //creating the full poly data, and create the region poly data sets
   vtkSmartPointer<vtkPolyData> pd1 = vtkSmartPointer<vtkPolyData>::New();
   vtkSmartPointer<vtkPolyData> pd2 = vtkSmartPointer<vtkPolyData>::New();
 #ifdef USE_MINE
-  vtkSmartPointer<vtkIntersectionPolyDataFilterMine> PolyDataIntersection = 
-	  vtkSmartPointer<vtkIntersectionPolyDataFilterMine>::New();
+
+  vtkSmartPointer<vtkBooleanOperationPolyDataFilterMine> myBoolean = 
+	  vtkSmartPointer<vtkBooleanOperationPolyDataFilterMine>::New();
 #else
-  vtkSmartPointer<vtkIntersectionPolyDataFilter> PolyDataIntersection = 
-	  vtkSmartPointer<vtkIntersectionPolyDataFilter>::New();
+  vtkSmartPointer<vtkBooleanOperationPolyDataFilter> myBoolean = 
+	  vtkSmartPointer<vtkBooleanOperationPolyDataFilter>::New();
 #endif
 
   //Call Function to Read File
@@ -137,20 +140,36 @@ int main(int argc, char *argv[])
   ReadSTLFile(inputFilename1,pd1); 
   ReadSTLFile(inputFilename2,pd2); 
 
-  //INTERSECTION OPERATION
-  std::cout<<"Performing Intersection..."<<endl;
-  PolyDataIntersection->AddInputData(0,pd1);
-  PolyDataIntersection->AddInputData(1,pd2);
-  PolyDataIntersection->SplitFirstOutputOn();
-  PolyDataIntersection->SplitSecondOutputOn();
-  PolyDataIntersection->Update();
 
-  std::cout<<"Done...Writing Files..."<<endl;
-  WriteVTPFile(inputFilename1,PolyDataIntersection->GetOutput(0),"_IntersectionLines");
-  WriteVTPFile(inputFilename1,PolyDataIntersection->GetOutput(1),"_IntersectionObject1");
-  WriteVTPFile(inputFilename2,PolyDataIntersection->GetOutput(2),"_IntersectionObject2");
-  std::cout<<"Done"<<endl;
+  //BOOLEAN OPERATION EMBEDDED INTERSECTION
+  vtkSmartPointer<vtkPolyData> fullpd = 
+	  vtkSmartPointer<vtkPolyData>::New();
+  myBoolean->SetInputData(0,pd1);
+  myBoolean->SetInputData(1,pd2);
 
+  if (op == 0)
+    myBoolean->SetOperationToUnion();
+  else if (op == 1)
+    myBoolean->SetOperationToIntersection();
+  else if (op == 2)
+    myBoolean->SetOperationToDifference();
+
+  myBoolean->Update();
+  fullpd->DeepCopy(myBoolean->GetOutput());
+
+  fullpd->GetCellData()->RemoveArray("BadTri");
+  fullpd->GetCellData()->RemoveArray("FreeEdge");
+
+  vtkIntersectionPolyDataFilterMine::CleanAndCheckSurface(fullpd);
+  double fullbadtri[2], fullfreeedge[2];
+  fullpd->GetCellData()->GetArray("BadTri")->GetRange(fullbadtri,0);
+  fullpd->GetCellData()->GetArray("FreeEdge")->GetRange(fullfreeedge,0);
+
+  std::cout<<"FULL SURFACE BAD TRI MIN: "<<fullbadtri[0]<<" MAX: "<<fullbadtri[1]<<endl;
+  std::cout<<"FULL SURFACE FREE EDGE MIN: "<<fullfreeedge[0]<<" MAX: "<<fullfreeedge[1]<<endl;
+
+
+  WriteVTPFile(inputFilename1,fullpd,"_FullBoolean");
   //Exit the program without errors
   return EXIT_SUCCESS;
 }

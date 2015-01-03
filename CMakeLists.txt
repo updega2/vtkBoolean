@@ -10,13 +10,25 @@ option(NEW_SPLIT "" OFF)
 option(EAR_CLIP "" OFF)
  
 add_executable(Intersect Intersect.cxx 
+			 vtkIntersectionPolyDataFilterMine.cxx)
+
+add_executable(Boolean Boolean.cxx 
 			 vtkIntersectionPolyDataFilterMine.cxx
-			 vtkBooleanOperationPolyDataFilterMine.cxx)
+			 vtkBooleanPolyDataFilterMine.cxx)
+
+add_executable(VesselIntersection VesselIntersection.cxx 
+			 vtkIntersectionPolyDataFilterMine.cxx
+			 vtkBooleanPolyDataFilterMine.cxx
+			 vtkMultiplePolyDataIntersectionFilter.cxx)
  
 if(VTK_LIBRARIES)
 	target_link_libraries(Intersect ${VTK_LIBRARIES})
+	target_link_libraries(Boolean ${VTK_LIBRARIES})
+	target_link_libraries(VesselIntersection ${VTK_LIBRARIES})
 else()
 	target_link_libraries(Intersect vtkHybrid)
+	target_link_libraries(Boolean vtkHybrid)
+	target_link_libraries(VesselIntersection vtkHybrid)
 endif()
 
 if(WITH_MINE)
