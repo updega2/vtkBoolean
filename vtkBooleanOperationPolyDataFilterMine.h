@@ -51,6 +51,20 @@ public:
 
   void PrintSelf(ostream& os, vtkIndent indent);
 
+  // Description:
+  // Integer describing the number of intersection points and lines
+  vtkGetMacro(NumberOfIntersectionPoints, int);
+  vtkSetMacro(NumberOfIntersectionPoints, int);
+  vtkBooleanMacro(NumberOfIntersectionPoints, int);
+  vtkGetMacro(NumberOfIntersectionLines, int);
+  vtkSetMacro(NumberOfIntersectionLines, int);
+  vtkBooleanMacro(NumberOfIntersectionLines, int);
+
+  // Description:
+  // Boolean to ouptut intersection or not
+  vtkGetMacro(NoIntersectionOutput, int);
+  vtkSetMacro(NoIntersectionOutput, int);
+  vtkBooleanMacro(NoIntersectionOutput, int);
   enum OperationType
   {
     VTK_UNION=0,
@@ -88,6 +102,9 @@ private:
   // Which operation to perform.
   // Can be VTK_UNION, VTK_INTERSECTION, or VTK_DIFFERENCE.
   int Operation;
+  int NoIntersectionOutput;
+  int NumberOfIntersectionPoints;
+  int NumberOfIntersectionLines;
 
   class Impl;
 

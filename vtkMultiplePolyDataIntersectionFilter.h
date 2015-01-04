@@ -93,8 +93,8 @@ public:
 
   // Description:
   // Set/get the boolean determing the output when two objects don't 
-  // intersect. With a value of 1, both objects output. With a value of 0,
-  // neither object is output. 
+  // intersect. With a value of 1, either objects output. With a value of 1,
+  // both objects are output. 
   vtkSetMacro(NoIntersectionOutput,int);
   vtkGetMacro(NoIntersectionOutput,int);
 

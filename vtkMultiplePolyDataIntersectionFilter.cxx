@@ -191,14 +191,13 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(vtkPolyData* inpu
       int i = checkInputArray->GetId(c);
       for (int j = 0;j < numInputs; j++)
         {
+	  std::cout<<"INTERSECTION of "<<i<<" and "<<j<<endl;
+          this->PrintTable(numInputs);
+	//Bounding boxes intersect!
         if (this->IntersectionTable[i][j] == 1)
           {
 	    this->IntersectionTable[i][j] = -1;
 	    this->IntersectionTable[j][i] = -1;
-	  for (int k = 0;k < numInputs; k++)
-	    {
-	    this->IntersectionTable[j][k] = -1;
-	    }
 
 #ifdef USE_MINE
 	  vtkSmartPointer<vtkBooleanOperationPolyDataFilterMine> boolean = 
@@ -209,14 +208,29 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(vtkPolyData* inpu
 #endif
 	  boolean->SetInputData(0,this->BooleanObject);
 	  boolean->SetInputData(1,inputs[j]);
+	  boolean->SetNoIntersectionOutput(0);
 	  boolean->SetOperationToUnion();
 	  boolean->Update();
 
-	  this->BooleanObject->DeepCopy(boolean->GetOutput());
-	  checkInputArray2->InsertNextId(j);
+	  int numPts = boolean->GetNumberOfIntersectionPoints();
+	  int numLines = boolean->GetNumberOfIntersectionLines();
+
+	  //Objects actually don't intersect
+	  if (numPts == 0 || numLines == 0)
+	    {
+	      std::cout<<"NO INTERSECTION"<<endl;
+	    }
+	  else 
+	    {
+	      this->BooleanObject->DeepCopy(boolean->GetOutput());
+	      checkInputArray2->InsertNextId(j);
+	      for (int k = 0;k < numInputs; k++)
+		{
+		this->IntersectionTable[k][j] = -1;
+		}
+	    }
           }
         }
-        this->PrintTable(numInputs);
       }
       tmp = checkInputArray;
       checkInputArray = checkInputArray2;

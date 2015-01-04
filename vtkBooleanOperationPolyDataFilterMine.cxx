@@ -804,6 +804,10 @@ vtkBooleanOperationPolyDataFilterMine::vtkBooleanOperationPolyDataFilterMine() :
 
   this->SetNumberOfInputPorts(2);
   this->SetNumberOfOutputPorts(2);
+  this->NoIntersectionOutput = 1;
+
+  this->NumberOfIntersectionPoints = 0;
+  this->NumberOfIntersectionLines = 0;
 
 }
 
@@ -852,6 +856,12 @@ int vtkBooleanOperationPolyDataFilterMine::RequestData(vtkInformation*        vt
   PolyDataIntersection->SplitFirstOutputOn();
   PolyDataIntersection->SplitSecondOutputOn();
   PolyDataIntersection->Update();
+  
+  this->NumberOfIntersectionPoints = 
+	  PolyDataIntersection->GetNumberOfIntersectionPoints();
+  this->NumberOfIntersectionLines = 
+	  PolyDataIntersection->GetNumberOfIntersectionLines();
+
 
   cout<<"Intersection is Done!!!"<<endl;
 
@@ -870,6 +880,24 @@ int vtkBooleanOperationPolyDataFilterMine::RequestData(vtkInformation*        vt
   impl->Mesh[1]->DeepCopy(PolyDataIntersection->GetOutput(2));
   impl->Mesh[1]->BuildLinks();
   impl->IntersectionLines->DeepCopy(PolyDataIntersection->GetOutput(0));
+
+  if (this->NumberOfIntersectionPoints == 0 ||
+		  this->NumberOfIntersectionLines == 0)
+  {
+    vtkGenericWarningMacro( << "No intersections!");
+    if (this->NoIntersectionOutput)
+      return 0;
+    else 
+    {
+      vtkSmartPointer<vtkAppendPolyData> appender = 
+	vtkSmartPointer<vtkAppendPolyData>::New();
+      appender->AddInputData(impl->Mesh[0]);
+      appender->AddInputData(impl->Mesh[1]);
+      appender->Update();
+      outputSurface->DeepCopy(appender->GetOutput());
+      return 1;
+    }
+  }
 
   double badtri1[2], badtri2[2];
   double freeedge1[2], freeedge2[2];

@@ -42,6 +42,15 @@ public:
   virtual void PrintSelf(ostream &os, vtkIndent indent);
 
   // Description:
+  // Integer describing the number of intersection points and lines
+  vtkGetMacro(NumberOfIntersectionPoints, int);
+  vtkSetMacro(NumberOfIntersectionPoints, int);
+  vtkBooleanMacro(NumberOfIntersectionPoints, int);
+  vtkGetMacro(NumberOfIntersectionLines, int);
+  vtkSetMacro(NumberOfIntersectionLines, int);
+  vtkBooleanMacro(NumberOfIntersectionLines, int);
+
+  // Description:
   // If on, the second output will be the first input mesh split by the
   // intersection with the second input mesh. Defaults to on.
   vtkGetMacro(SplitFirstOutput, int);
@@ -80,6 +89,8 @@ private:
   vtkIntersectionPolyDataFilterMine(const vtkIntersectionPolyDataFilterMine&); // Not implemented
   void operator=(const vtkIntersectionPolyDataFilterMine&); // Not implemented
 
+  int NumberOfIntersectionPoints;
+  int NumberOfIntersectionLines;
   int SplitFirstOutput;
   int SplitSecondOutput;
 

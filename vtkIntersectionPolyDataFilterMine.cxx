@@ -2074,6 +2074,9 @@ vtkIntersectionPolyDataFilterMine::vtkIntersectionPolyDataFilterMine()
 {
   this->SetNumberOfInputPorts(2);
   this->SetNumberOfOutputPorts(3);
+
+  this->NumberOfIntersectionPoints = 0;
+  this->NumberOfIntersectionLines = 0;
 }
 
 //----------------------------------------------------------------------------
@@ -2529,6 +2532,8 @@ int vtkIntersectionPolyDataFilterMine::RequestData(vtkInformation*        vtkNot
   }
   //WriteVTPFile(tmpLines,"FullLinesNotClean");
   std::cout<<"LINEPTSAFTER "<<outputIntersection->GetNumberOfPoints()<<endl;
+  this->NumberOfIntersectionPoints = outputIntersection->GetNumberOfPoints();
+  this->NumberOfIntersectionLines = outputIntersection->GetNumberOfLines();
 
   impl->BoundaryPoints[0] = vtkIntArray::New();
   impl->BoundaryPoints[1] = vtkIntArray::New();

@@ -88,6 +88,22 @@ void ReadSTLFile(std::string inputFilename, vtkPolyData *polydata)
   polydata->BuildLinks();
 }
 
+//Function to read in the STL file, extract the boundaries and pass the input 
+//Poly Data information 
+void ReadVTPFile(std::string inputFilename, vtkPolyData *polydata)
+{
+  //Create an STL reader for reading the file
+  vtkSmartPointer<vtkXMLPolyDataReader> reader = 
+	  vtkSmartPointer<vtkXMLPolyDataReader>::New();
+  reader->SetFileName(inputFilename.c_str());
+  reader->Update();
+
+  //Save the output information from the boundary filter to a Poly Data 
+  //structure
+  polydata->DeepCopy(reader->GetOutput());
+  polydata->BuildLinks();
+}
+
 //Function to write the polydata to a vtp
 void WriteVTPFile(std::string inputFilename,vtkPolyData *writePolyData,std::string attachName)
 {
@@ -122,7 +138,7 @@ int main(int argc, char *argv[])
   {
     inputFilenames[i] = argv[i+1];
     inputPDs[i] = vtkPolyData::New();
-    ReadSTLFile(inputFilenames[i],inputPDs[i]);
+    ReadVTPFile(inputFilenames[i],inputPDs[i]);
   }
 
   vtkSmartPointer<vtkPolyData> fullpd = 
