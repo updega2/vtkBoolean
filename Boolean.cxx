@@ -140,7 +140,6 @@ int main(int argc, char *argv[])
   ReadSTLFile(inputFilename1,pd1); 
   ReadSTLFile(inputFilename2,pd2); 
 
-
   //BOOLEAN OPERATION EMBEDDED INTERSECTION
   vtkSmartPointer<vtkPolyData> fullpd = 
 	  vtkSmartPointer<vtkPolyData>::New();

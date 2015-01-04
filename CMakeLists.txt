@@ -14,11 +14,11 @@ add_executable(Intersect Intersect.cxx
 
 add_executable(Boolean Boolean.cxx 
 			 vtkIntersectionPolyDataFilterMine.cxx
-			 vtkBooleanPolyDataFilterMine.cxx)
+			 vtkBooleanOperationPolyDataFilterMine.cxx)
 
 add_executable(VesselIntersection VesselIntersection.cxx 
 			 vtkIntersectionPolyDataFilterMine.cxx
-			 vtkBooleanPolyDataFilterMine.cxx
+			 vtkBooleanOperationPolyDataFilterMine.cxx
 			 vtkMultiplePolyDataIntersectionFilter.cxx)
  
 if(VTK_LIBRARIES)

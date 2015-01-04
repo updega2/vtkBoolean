@@ -181,6 +181,7 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(vtkPolyData* inpu
     vtkSmartPointer<vtkIdList>::New();
   vtkSmartPointer<vtkIdList> tmp = 
     vtkSmartPointer<vtkIdList>::New();
+
   this->BooleanObject->DeepCopy(inputs[0]);
   checkInputArray->InsertNextId(0);
   while ((numChecks = checkInputArray->GetNumberOfIds()) > 0)
@@ -192,10 +193,13 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(vtkPolyData* inpu
         {
         if (this->IntersectionTable[i][j] == 1)
           {
+	    this->IntersectionTable[i][j] = -1;
+	    this->IntersectionTable[j][i] = -1;
 	  for (int k = 0;k < numInputs; k++)
 	    {
-	    this->IntersectionTable[k][i] = -1;
+	    this->IntersectionTable[j][k] = -1;
 	    }
+
 #ifdef USE_MINE
 	  vtkSmartPointer<vtkBooleanOperationPolyDataFilterMine> boolean = 
 	    vtkSmartPointer<vtkBooleanOperationPolyDataFilterMine>::New();
@@ -203,7 +207,6 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(vtkPolyData* inpu
 	  vtkSmartPointer<vtkBooleanOperationPolyDataFilter> boolean = 
 	    vtkSmartPointer<vtkBooleanOperationPolyDataFilter>::New();
 #endif
-
 	  boolean->SetInputData(0,this->BooleanObject);
 	  boolean->SetInputData(1,inputs[j]);
 	  boolean->SetOperationToUnion();
@@ -213,6 +216,7 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(vtkPolyData* inpu
 	  checkInputArray2->InsertNextId(j);
           }
         }
+        this->PrintTable(numInputs);
       }
       tmp = checkInputArray;
       checkInputArray = checkInputArray2;

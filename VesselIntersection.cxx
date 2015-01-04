@@ -1,5 +1,5 @@
 //
-//  Boolean.cxx
+//  VesselIntersection.cxx
 //  
 //
 //  Created by Adam Updegrove on 1/3/15.
@@ -114,15 +114,15 @@ void WriteVTPFile(std::string inputFilename,vtkPolyData *writePolyData,std::stri
 int main(int argc, char *argv[])
 {
   std::string *inputFilenames;
-  inputFilename = new std::string[argc-1];
+  inputFilenames = new std::string[argc-1];
   vtkPolyData **inputPDs;
   inputPDs = new vtkPolyData*[argc-1];
   //Create string from input File Name on command line
   for (int i =0;i<argc-1;i++)
   {
-    inputFilenames[i+1] = argv[i+1];
+    inputFilenames[i] = argv[i+1];
     inputPDs[i] = vtkPolyData::New();
-    ReadSTLFile(inputFilenames[i+1],inputPDs[i]);
+    ReadSTLFile(inputFilenames[i],inputPDs[i]);
   }
 
   vtkSmartPointer<vtkPolyData> fullpd = 
@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
   std::cout<<"FULL SURFACE FREE EDGE MIN: "<<fullfreeedge[0]<<" MAX: "<<fullfreeedge[1]<<endl;
 
 
-  WriteVTPFile(inputFilename1,fullpd,"_FullBoolean");
+  WriteVTPFile(inputFilenames[0],fullpd,"_FullBoolean");
 
   //Delete memory used
   delete [] inputFilenames;
