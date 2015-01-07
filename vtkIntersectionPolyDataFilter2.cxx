@@ -1944,6 +1944,8 @@ int vtkIntersectionPolyDataFilter2::RequestData(vtkInformation*        vtkNotUse
     impl->BoundaryPoints[1]->Delete();
     impl->PointCellIds[0]->Delete();
     impl->PointCellIds[1]->Delete();
+
+    delete impl;
     return 0;
   }
 

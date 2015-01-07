@@ -184,9 +184,13 @@ vtkBooleanOperationPolyDataFilter2::Impl::~Impl()
     this->FalsePositiveArray[i]->Delete();
     this->NewCellIds[i]->Delete();
 
-    delete [] this->checked[i];
+    if (this->checked[i] != NULL)
+      delete [] this->checked[i];
+    if (this->checkedcarefully[i] != NULL)
     delete [] this->checkedcarefully[i];
+    if (this->pointMapper[i] != NULL)
     delete [] this->pointMapper[i];
+    if (this->reversePointMapper[i] != NULL)
     delete [] this->reversePointMapper[i];
   }
   this->IntersectionLines->Delete();
@@ -926,7 +930,11 @@ int vtkBooleanOperationPolyDataFilter2::RequestData(
   {
     vtkGenericWarningMacro( << "No intersections!");
     if (this->NoIntersectionOutput)
+    {
+
+      delete impl;
       return 0;
+    }
     else 
     {
       vtkSmartPointer<vtkAppendPolyData> appender = 
@@ -935,6 +943,8 @@ int vtkBooleanOperationPolyDataFilter2::RequestData(
       appender->AddInputData(impl->Mesh[1]);
       appender->Update();
       outputSurface->DeepCopy(appender->GetOutput());
+
+      delete impl;
       return 1;
     }
   }
