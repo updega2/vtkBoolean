@@ -1937,6 +1937,13 @@ int vtkIntersectionPolyDataFilter2::RequestData(vtkInformation*        vtkNotUse
 		  this->NumberOfIntersectionLines == 0)
   {
     vtkGenericWarningMacro( << "No Intersection between objects ");
+    //Clean up
+    impl->NewCellIds[0]->Delete();
+    impl->NewCellIds[1]->Delete();
+    impl->BoundaryPoints[0]->Delete();
+    impl->BoundaryPoints[1]->Delete();
+    impl->PointCellIds[0]->Delete();
+    impl->PointCellIds[1]->Delete();
     return 0;
   }
 
