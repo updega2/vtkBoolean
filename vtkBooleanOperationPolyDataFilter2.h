@@ -1,7 +1,7 @@
 /*=========================================================================
 
   Program:   Visualization Toolkit
-  Module:    vtkBooleanOperationPolyDataFilterMine.h
+  Module:    vtkBooleanOperationPolyDataFilter2.h
 
   Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
   All rights reserved.
@@ -12,7 +12,7 @@
      PURPOSE.  See the above copyright notice for more information.
 
 =========================================================================*/
-// .NAME vtkBooleanOperationPolyDataFilterMine
+// .NAME vtkBooleanOperationPolyDataFilter2
 // .SECTION Description
 //
 // Computes the boundary of the union, intersection, or difference
@@ -29,8 +29,8 @@
 // http://hdl.handle.net/10380/3262
 // http://www.midasjournal.org/browse/publication/797
 
-#ifndef __vtkBooleanOperationPolyDataFilterMine_h
-#define __vtkBooleanOperationPolyDataFilterMine_h
+#ifndef __vtkBooleanOperationPolyDataFilter2_h
+#define __vtkBooleanOperationPolyDataFilter2_h
 
 #include "vtkFiltersGeneralModule.h" // For export macro
 #include "vtkPolyDataAlgorithm.h"
@@ -39,14 +39,14 @@
 
 class vtkIdList;
 
-class VTKFILTERSGENERAL_EXPORT vtkBooleanOperationPolyDataFilterMine : public vtkPolyDataAlgorithm
+class VTKFILTERSGENERAL_EXPORT vtkBooleanOperationPolyDataFilter2 : public vtkPolyDataAlgorithm
 {
 public:
   // Description:
   // Construct object that computes the boolean surface.
-  static vtkBooleanOperationPolyDataFilterMine *New();
+  static vtkBooleanOperationPolyDataFilter2 *New();
 
-  vtkTypeMacro(vtkBooleanOperationPolyDataFilterMine,
+  vtkTypeMacro(vtkBooleanOperationPolyDataFilter2,
                vtkPolyDataAlgorithm);
 
   void PrintSelf(ostream& os, vtkIndent indent);
@@ -84,15 +84,15 @@ public:
   { this->SetOperation( VTK_DIFFERENCE ); }
 
 protected:
-  vtkBooleanOperationPolyDataFilterMine();
-  ~vtkBooleanOperationPolyDataFilterMine();
+  vtkBooleanOperationPolyDataFilter2();
+  ~vtkBooleanOperationPolyDataFilter2();
 
   int RequestData(vtkInformation*, vtkInformationVector**, vtkInformationVector*);
   int FillInputPortInformation(int, vtkInformation*);
 
 private:
-  vtkBooleanOperationPolyDataFilterMine(const vtkBooleanOperationPolyDataFilterMine&); // Not implemented
-  void operator=(const vtkBooleanOperationPolyDataFilterMine&); // Not implemented
+  vtkBooleanOperationPolyDataFilter2(const vtkBooleanOperationPolyDataFilter2&); // Not implemented
+  void operator=(const vtkBooleanOperationPolyDataFilter2&); // Not implemented
 
   // Description:
   // PolyDatas for each surface out of intersection and also the intersection

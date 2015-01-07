@@ -17,7 +17,7 @@
 #include "vtkXMLPolyDataWriter.h"
 #include "vtkXMLUnstructuredGridWriter.h"
 #include "vtkDistancePolyDataFilter.h"
-#include "vtkIntersectionPolyDataFilterMine.h"
+#include "vtkIntersectionPolyDataFilter2.h"
 #include "vtkIntersectionPolyDataFilter.h"
 #include "vtkPolyData.h"
 #include "vtkDataArray.h"
@@ -125,8 +125,8 @@ int main(int argc, char *argv[])
   vtkSmartPointer<vtkPolyData> pd1 = vtkSmartPointer<vtkPolyData>::New();
   vtkSmartPointer<vtkPolyData> pd2 = vtkSmartPointer<vtkPolyData>::New();
 #ifdef USE_MINE
-  vtkSmartPointer<vtkIntersectionPolyDataFilterMine> PolyDataIntersection = 
-	  vtkSmartPointer<vtkIntersectionPolyDataFilterMine>::New();
+  vtkSmartPointer<vtkIntersectionPolyDataFilter2> PolyDataIntersection = 
+	  vtkSmartPointer<vtkIntersectionPolyDataFilter2>::New();
 #else
   vtkSmartPointer<vtkIntersectionPolyDataFilter> PolyDataIntersection = 
 	  vtkSmartPointer<vtkIntersectionPolyDataFilter>::New();

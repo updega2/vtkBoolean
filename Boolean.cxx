@@ -17,8 +17,8 @@
 #include "vtkXMLPolyDataWriter.h"
 #include "vtkXMLUnstructuredGridWriter.h"
 #include "vtkDistancePolyDataFilter.h"
-#include "vtkIntersectionPolyDataFilterMine.h"
-#include "vtkBooleanOperationPolyDataFilterMine.h"
+#include "vtkIntersectionPolyDataFilter2.h"
+#include "vtkBooleanOperationPolyDataFilter2.h"
 #include "vtkBooleanOperationPolyDataFilter.h"
 #include "vtkPolyData.h"
 #include "vtkDataArray.h"
@@ -128,8 +128,8 @@ int main(int argc, char *argv[])
   vtkSmartPointer<vtkPolyData> pd2 = vtkSmartPointer<vtkPolyData>::New();
 #ifdef USE_MINE
 
-  vtkSmartPointer<vtkBooleanOperationPolyDataFilterMine> myBoolean = 
-	  vtkSmartPointer<vtkBooleanOperationPolyDataFilterMine>::New();
+  vtkSmartPointer<vtkBooleanOperationPolyDataFilter2> myBoolean = 
+	  vtkSmartPointer<vtkBooleanOperationPolyDataFilter2>::New();
 #else
   vtkSmartPointer<vtkBooleanOperationPolyDataFilter> myBoolean = 
 	  vtkSmartPointer<vtkBooleanOperationPolyDataFilter>::New();
@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
   fullpd->GetCellData()->RemoveArray("BadTri");
   fullpd->GetCellData()->RemoveArray("FreeEdge");
 
-  vtkIntersectionPolyDataFilterMine::CleanAndCheckSurface(fullpd);
+  vtkIntersectionPolyDataFilter2::CleanAndCheckSurface(fullpd);
   double fullbadtri[2], fullfreeedge[2];
   fullpd->GetCellData()->GetArray("BadTri")->GetRange(fullbadtri,0);
   fullpd->GetCellData()->GetArray("FreeEdge")->GetRange(fullfreeedge,0);

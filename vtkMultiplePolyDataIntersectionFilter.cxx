@@ -24,7 +24,7 @@
 #include "vtkPointData.h"
 #include "vtkPolyData.h"
 #include "vtkStreamingDemandDrivenPipeline.h"
-#include "vtkBooleanOperationPolyDataFilterMine.h"
+#include "vtkBooleanOperationPolyDataFilter2.h"
 #include "vtkTrivialProducer.h"
 #include "vtkSmartPointer.h"
 #include "vtkBoundingBox.h"
@@ -123,7 +123,8 @@ SetInputConnectionByNumber(int num,vtkAlgorithmOutput *input)
   if (!this->UserManagedInputs)
     {
     vtkErrorMacro(<<
-      "SetInputConnectionByNumber is not supported if UserManagedInputs is false");
+      "SetInputConnectionByNumber is not supported if UserManagedInputs "<<
+      "is false");
     return;
     }
 
@@ -131,7 +132,8 @@ SetInputConnectionByNumber(int num,vtkAlgorithmOutput *input)
   this->SetNthInputConnection(0, num, input);
 }
 
-int vtkMultiplePolyDataIntersectionFilter::BuildIntersectionTable(vtkPolyData* inputs[], int numInputs)
+int vtkMultiplePolyDataIntersectionFilter::BuildIntersectionTable(
+    vtkPolyData* inputs[], int numInputs)
 {
   for (int i = 0;i < numInputs;i++)
     {
@@ -172,7 +174,8 @@ int vtkMultiplePolyDataIntersectionFilter::BuildIntersectionTable(vtkPolyData* i
   return totalIntersections;
 }
 
-int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(vtkPolyData* inputs[], int numInputs)
+int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(
+    vtkPolyData* inputs[], int numInputs)
 {                                            
   int numChecks = 0;  
   vtkSmartPointer<vtkIdList> checkInputArray = 
@@ -199,13 +202,9 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(vtkPolyData* inpu
 	    this->IntersectionTable[i][j] = -1;
 	    this->IntersectionTable[j][i] = -1;
 
-#ifdef USE_MINE
-	  vtkSmartPointer<vtkBooleanOperationPolyDataFilterMine> boolean = 
-	    vtkSmartPointer<vtkBooleanOperationPolyDataFilterMine>::New();
-#else
-	  vtkSmartPointer<vtkBooleanOperationPolyDataFilter> boolean = 
-	    vtkSmartPointer<vtkBooleanOperationPolyDataFilter>::New();
-#endif
+	  vtkSmartPointer<vtkBooleanOperationPolyDataFilter2> boolean = 
+	    vtkSmartPointer<vtkBooleanOperationPolyDataFilter2>::New();
+
 	  boolean->SetInputData(0,this->BooleanObject);
 	  boolean->SetInputData(1,inputs[j]);
 	  boolean->SetNoIntersectionOutput(0);
@@ -257,9 +256,10 @@ void vtkMultiplePolyDataIntersectionFilter::PrintTable(int numInputs)
 //----------------------------------------------------------------------------
 // This method is much too long, and has to be broken up!
 // Append data sets into single polygonal data set.
-int vtkMultiplePolyDataIntersectionFilter::RequestData(vtkInformation *vtkNotUsed(request),
-                                   vtkInformationVector **inputVector,
-                                   vtkInformationVector *outputVector)
+int vtkMultiplePolyDataIntersectionFilter::RequestData(
+    vtkInformation *vtkNotUsed(request),
+    vtkInformationVector **inputVector,
+    vtkInformationVector *outputVector)
 {
   // get the info object
   // get the ouptut
@@ -303,9 +303,10 @@ int vtkMultiplePolyDataIntersectionFilter::RequestData(vtkInformation *vtkNotUse
 }
 
 //----------------------------------------------------------------------------
-int vtkMultiplePolyDataIntersectionFilter::RequestUpdateExtent(vtkInformation *vtkNotUsed(request),
-                                           vtkInformationVector **inputVector,
-                                           vtkInformationVector *outputVector)
+int vtkMultiplePolyDataIntersectionFilter::RequestUpdateExtent(
+    vtkInformation *vtkNotUsed(request),
+    vtkInformationVector **inputVector,
+    vtkInformationVector *outputVector)
 {
   // get the output info object
   vtkInformation *outInfo = outputVector->GetInformationObject(0);
@@ -313,9 +314,12 @@ int vtkMultiplePolyDataIntersectionFilter::RequestUpdateExtent(vtkInformation *v
   int piece, numPieces, ghostLevel;
   int idx;
 
-  piece = outInfo->Get(vtkStreamingDemandDrivenPipeline::UPDATE_PIECE_NUMBER());
-  numPieces = outInfo->Get(vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_PIECES());
-  ghostLevel = outInfo->Get(vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_GHOST_LEVELS());
+  piece = outInfo->Get(
+      vtkStreamingDemandDrivenPipeline::UPDATE_PIECE_NUMBER());
+  numPieces = outInfo->Get(
+      vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_PIECES());
+  ghostLevel = outInfo->Get(
+      vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_GHOST_LEVELS());
 
   // make sure piece is valid
   if (piece < 0 || piece >= numPieces)
@@ -339,20 +343,26 @@ int vtkMultiplePolyDataIntersectionFilter::RequestUpdateExtent(vtkInformation *v
       {
       if (this->ParallelStreaming)
         {
-        inInfo->Set(vtkStreamingDemandDrivenPipeline::UPDATE_PIECE_NUMBER(),
-                    piece + idx);
-        inInfo->Set(vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_PIECES(),
+        inInfo->Set(
+	    vtkStreamingDemandDrivenPipeline::UPDATE_PIECE_NUMBER(),
+	    piece + idx);
+        inInfo->Set(
+	    vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_PIECES(),
                     numPieces);
-        inInfo->Set(vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_GHOST_LEVELS(),
+        inInfo->Set(
+	    vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_GHOST_LEVELS(),
                     ghostLevel);
         }
       else
         {
-        inInfo->Set(vtkStreamingDemandDrivenPipeline::UPDATE_PIECE_NUMBER(),
+        inInfo->Set(
+	    vtkStreamingDemandDrivenPipeline::UPDATE_PIECE_NUMBER(),
                     piece);
-        inInfo->Set(vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_PIECES(),
+        inInfo->Set(
+	    vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_PIECES(),
                     numPieces);
-        inInfo->Set(vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_GHOST_LEVELS(),
+        inInfo->Set(
+	    vtkStreamingDemandDrivenPipeline::UPDATE_NUMBER_OF_GHOST_LEVELS(),
                     ghostLevel);
         }
       }
@@ -369,7 +379,8 @@ vtkPolyData *vtkMultiplePolyDataIntersectionFilter::GetInput(int idx)
 }
 
 //----------------------------------------------------------------------------
-void vtkMultiplePolyDataIntersectionFilter::PrintSelf(ostream& os, vtkIndent indent)
+void vtkMultiplePolyDataIntersectionFilter::PrintSelf(ostream& os, 
+    vtkIndent indent)
 {
   this->Superclass::PrintSelf(os,indent);
 
@@ -380,7 +391,8 @@ void vtkMultiplePolyDataIntersectionFilter::PrintSelf(ostream& os, vtkIndent ind
 }
 
 //----------------------------------------------------------------------------
-int vtkMultiplePolyDataIntersectionFilter::FillInputPortInformation(int port, vtkInformation *info)
+int vtkMultiplePolyDataIntersectionFilter::FillInputPortInformation(
+    int port, vtkInformation *info)
 {
   if (!this->Superclass::FillInputPortInformation(port, info))
     {

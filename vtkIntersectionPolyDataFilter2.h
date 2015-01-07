@@ -1,7 +1,7 @@
 /*=========================================================================
 
   Program:   Visualization Toolkit
-  Module:    vtkIntersectionPolyDataFilterMine.h
+  Module:    vtkIntersectionPolyDataFilter2.h
 
   Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
   All rights reserved.
@@ -12,10 +12,10 @@
      PURPOSE.  See the above copyright notice for more information.
 
 =========================================================================*/
-// .NAME vtkIntersectionPolyDataFilterMine
+// .NAME vtkIntersectionPolyDataFilter2
 // .SECTION Description
 //
-// vtkIntersectionPolyDataFilterMine computes the intersection between two
+// vtkIntersectionPolyDataFilter2 computes the intersection between two
 // vtkPolyData objects. The first output is a set of lines that marks
 // the intersection of the input vtkPolyData objects. The second and
 // third outputs are the first and second input vtkPolyData,
@@ -28,17 +28,17 @@
 // http://hdl.handle.net/10380/3262
 // http://www.insight-journal.org/browse/publication/797
 
-#ifndef __vtkIntersectionPolyDataFilterMine_h
-#define __vtkIntersectionPolyDataFilterMine_h
+#ifndef __vtkIntersectionPolyDataFilter2_h
+#define __vtkIntersectionPolyDataFilter2_h
 
 #include "vtkFiltersGeneralModule.h" // For export macro
 #include "vtkPolyDataAlgorithm.h"
 
-class VTKFILTERSGENERAL_EXPORT vtkIntersectionPolyDataFilterMine : public vtkPolyDataAlgorithm
+class VTKFILTERSGENERAL_EXPORT vtkIntersectionPolyDataFilter2 : public vtkPolyDataAlgorithm
 {
 public:
-  static vtkIntersectionPolyDataFilterMine *New();
-  vtkTypeMacro(vtkIntersectionPolyDataFilterMine, vtkPolyDataAlgorithm);
+  static vtkIntersectionPolyDataFilter2 *New();
+  vtkTypeMacro(vtkIntersectionPolyDataFilter2, vtkPolyDataAlgorithm);
   virtual void PrintSelf(ostream &os, vtkIndent indent);
 
   // Description:
@@ -65,6 +65,20 @@ public:
   vtkBooleanMacro(SplitSecondOutput, int);
 
   // Description:
+  // If on, the third output will be the second input mesh split by the
+  // intersection with the first input mesh. Defaults to on.
+  vtkGetMacro(ApplyBoundaryPointArray, int);
+  vtkSetMacro(ApplyBoundaryPointArray, int);
+  vtkBooleanMacro(ApplyBoundaryPointArray, int);
+
+  // Description:
+  // If on, the third output will be the second input mesh split by the
+  // intersection with the first input mesh. Defaults to on.
+  vtkGetMacro(CheckMesh, int);
+  vtkSetMacro(CheckMesh, int);
+  vtkBooleanMacro(CheckMesh, int);
+
+  // Description:
   // Given two triangles defined by points (p1, q1, r1) and (p2, q2,
   // r2), returns whether the two triangles intersect. If they do,
   // the endpoints of the line forming the intersection are returned
@@ -73,29 +87,31 @@ public:
   static int TriangleTriangleIntersection(double p1[3], double q1[3], double r1[3],
                                           double p2[3], double q2[3], double r2[3],
                                           int &coplanar, double pt1[3], double pt2[3],
-					  double surfaceid[2], int &pointCase);
+					  double surfaceid[2]);
 
   static void CleanAndCheckSurface(vtkPolyData *pd);
 
 
 protected:
-  vtkIntersectionPolyDataFilterMine();
-  ~vtkIntersectionPolyDataFilterMine();
+  vtkIntersectionPolyDataFilter2();
+  ~vtkIntersectionPolyDataFilter2();
 
   int RequestData(vtkInformation*, vtkInformationVector**, vtkInformationVector*);
   int FillInputPortInformation(int, vtkInformation*);
 
 private:
-  vtkIntersectionPolyDataFilterMine(const vtkIntersectionPolyDataFilterMine&); // Not implemented
-  void operator=(const vtkIntersectionPolyDataFilterMine&); // Not implemented
+  vtkIntersectionPolyDataFilter2(const vtkIntersectionPolyDataFilter2&); // Not implemented
+  void operator=(const vtkIntersectionPolyDataFilter2&); // Not implemented
 
   int NumberOfIntersectionPoints;
   int NumberOfIntersectionLines;
   int SplitFirstOutput;
   int SplitSecondOutput;
+  int ApplyBoundaryPointArray;
+  int CheckMesh;
 
   class Impl;
 };
 
 
-#endif // __vtkIntersectionPolyDataFilterMine_h
+#endif // __vtkIntersectionPolyDataFilter2_h

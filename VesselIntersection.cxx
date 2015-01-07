@@ -17,8 +17,8 @@
 #include "vtkXMLPolyDataWriter.h"
 #include "vtkXMLUnstructuredGridWriter.h"
 #include "vtkDistancePolyDataFilter.h"
-#include "vtkIntersectionPolyDataFilterMine.h"
-#include "vtkBooleanOperationPolyDataFilterMine.h"
+#include "vtkIntersectionPolyDataFilter2.h"
+#include "vtkBooleanOperationPolyDataFilter2.h"
 #include "vtkIntersectionPolyDataFilter.h"
 #include "vtkBooleanOperationPolyDataFilter.h"
 #include "vtkPolyData.h"
@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
   {
     inputFilenames[i] = argv[i+1];
     inputPDs[i] = vtkPolyData::New();
-    ReadVTPFile(inputFilenames[i],inputPDs[i]);
+    ReadSTLFile(inputFilenames[i],inputPDs[i]);
   }
 
   vtkSmartPointer<vtkPolyData> fullpd = 
@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
   vesselInter->Update();
 
   fullpd->DeepCopy(vesselInter->GetOutput());
-  vtkIntersectionPolyDataFilterMine::CleanAndCheckSurface(fullpd);
+  vtkIntersectionPolyDataFilter2::CleanAndCheckSurface(fullpd);
   double fullbadtri[2], fullfreeedge[2];
   fullpd->GetCellData()->GetArray("BadTri")->GetRange(fullbadtri,0);
   fullpd->GetCellData()->GetArray("FreeEdge")->GetRange(fullfreeedge,0);
