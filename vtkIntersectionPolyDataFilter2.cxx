@@ -455,6 +455,7 @@ int vtkIntersectionPolyDataFilter2::Impl
   TouchedCellArray->SetNumberOfComponents(1);
   TouchedPointArray->SetNumberOfComponents(1);
 
+  std::cout<<"Splitting Mesh "<<inputIndex<<endl;
   vtkPolyData *input = this->Mesh[inputIndex];
   IntersectionMapType *intersectionMap = this->IntersectionMap[inputIndex];
   vtkCellData *inCD  = input->GetCellData();
@@ -948,17 +949,22 @@ vtkCellArray* vtkIntersectionPolyDataFilter2::Impl
 	  interPtBool[ptId] = true;
 	}
       }
-    //std::cout<<"Setting Boundary Point "<<reverseIdMap[ptId]<<endl;
     if (ptId > 2)
+    {
           BoundaryPoints[inputIndex]->InsertValue(reverseIdMap[ptId],1);
+//         std::cout<<"Setting Boundary Point "<<reverseIdMap[ptId]<<endl;
+    }
 
-    //std::cout<<"Setting Boundary Point "<<cellPts[ptId]<<endl;
     else if (CellPointOnInterLine[ptId])
+    {
+//          std::cout<<"Setting Boundary Point "<<cellPts[ptId]<<endl;
           BoundaryPoints[inputIndex]->InsertValue(cellPts[ptId],1);
-    //std::cout<<"Setting Boundary Point Bad "<<cellPts[ptId]<<endl;
-    //
+    }
     else
+    {
           BoundaryPoints[inputIndex]->InsertValue(cellPts[ptId],0);
+//    	std::cout<<"Setting Boundary Point Bad "<<cellPts[ptId]<<endl;
+    }
 
     }
   // Sort the edgePtIdList according to the angle list. The starting
@@ -1008,9 +1014,9 @@ vtkCellArray* vtkIntersectionPolyDataFilter2::Impl
     interpd->BuildLinks();
 
 //std::cout<<"NUMBER OF INTERSECTING POINTS! "<<
-//  interPtIdList->GetNumberOfTuples()<<endl;
+//    interPtIdList->GetNumberOfTuples()<<endl;
 //std::cout<<"NUMBER OF INTERSECTING LINES! "<<
-//  interceptlines->GetNumberOfCells()<<endl;
+//    interceptlines->GetNumberOfCells()<<endl;
 //    std::cout<<"FULLCELLID: "<<cellId<<endl;
     vtkSmartPointer<vtkPolyData> fullpd = vtkSmartPointer<vtkPolyData>::New();
     fullpd->SetPoints(points);
@@ -1025,23 +1031,23 @@ vtkCellArray* vtkIntersectionPolyDataFilter2::Impl
     transformer->Update();
     transformedpd = transformer->GetOutput();
     transformedpd->BuildLinks();
- //   if (cellId == 47 && inputIndex == 0)
- //   {
- //     WriteVTPFile(transformedpd,"TransformedCell_"+int2String(cellId));
+    if (cellId == 4385 && inputIndex == 0)
+    {
+      WriteVTPFile(transformedpd,"TransformedCell_"+int2String(cellId));
 
- //     WriteVTPFile(fullpd,"FullCell"+int2String(cellId));
- //     WriteVTPFile(interpd,"InterceptCell"+int2String(cellId));
- //   }
+      WriteVTPFile(fullpd,"FullCell"+int2String(cellId));
+      WriteVTPFile(interpd,"InterceptCell"+int2String(cellId));
+    }
 
     if (interPtIdList->GetNumberOfTuples() > 0 && interceptlines->GetNumberOfCells() > 0)
     {
       std::vector<simPolygon> loops;
-//      std::cout<<"BOOL: ";
-//      for (int k=0;k<points->GetNumberOfPoints();k++)
-//      {
-//	std::cout<<interPtBool[k]<<" ";
-//      }
-//      std::cout<<" end"<<endl;
+     // std::cout<<"BOOL: ";
+     // for (int k=0;k<points->GetNumberOfPoints();k++)
+     // {
+     //   std::cout<<interPtBool[k]<<" ";
+     // }
+     // std::cout<<" end"<<endl;
       this->GetLoops(transformedpd,&loops);
       for (int k=0;k<loops.size();k++)
       {
@@ -1071,7 +1077,7 @@ vtkCellArray* vtkIntersectionPolyDataFilter2::Impl
             if ( ptIds[i] < 3) // Point from the cell
             {
               remappedPtId = cellPts[ ptIds[i]] ;
-//	      std::cout<<"Cell has point "<<remappedPtId<<endl;
+	      //std::cout<<"Cell has point "<<remappedPtId<<endl;
 	      if (CellPointOnInterLine[ptIds[i]])
 	      {
 		interPts[interPtCount++] = reverseLineIdMap[ptIds[i]];
@@ -1080,7 +1086,7 @@ vtkCellArray* vtkIntersectionPolyDataFilter2::Impl
             else
             {
               remappedPtId = reverseIdMap[ptIds[i]];
-//	      std::cout<<"Cell has point "<<remappedPtId<<endl;
+	      //std::cout<<"Cell has point "<<remappedPtId<<endl;
 	      interPts[interPtCount++] = reverseLineIdMap[ptIds[i]];
             }
             splitCells->InsertCellPoint( remappedPtId );
@@ -1091,7 +1097,7 @@ vtkCellArray* vtkIntersectionPolyDataFilter2::Impl
 	    this->AddToNewCellMap(inputIndex, interPtCount,interPts,
 		interLines,numCurrCells);
 	  }
-//          std::cout<<"Num Current Cells "<<numCurrCells<<endl;
+          std::cout<<"Num Current Cells "<<numCurrCells<<endl;
 	  numCurrCells++;
         }
 	polys->Delete();
@@ -2058,7 +2064,7 @@ void vtkIntersectionPolyDataFilter2::Impl
   {
     ptBool[ptId] = false;
   }
-//  std::cout<<"Number Of Cells: "<<numCells<<endl;
+  //std::cout<<"Number Of Cells: "<<numCells<<endl;
   for (vtkIdType lineId = 0;lineId < numCells;lineId++)
   {
     lineBool[lineId] = false;
@@ -2086,7 +2092,7 @@ void vtkIntersectionPolyDataFilter2::Impl
   {
     if (lineBool[lineId] == false)
     {
-//      std::cout<<"LINE FALSE: Find extra loop/s"<<endl;
+      std::cout<<"LINE FALSE: Find extra loop/s"<<endl;
       pd->GetCellPoints(lineId,cellPoints);
       nextPt.id = cellPoints->GetId(0);
       pd->GetPoint(nextPt.id,nextPt.pt);
@@ -2231,6 +2237,8 @@ void vtkIntersectionPolyDataFilter2::Impl
     vtkIdType nextPt, vtkIdType prevPt, vtkIdList *pointCells)
 {
   //Follow the orientation of this loop
+  int foundcell = 0;
+  double extracell = 0;
   double l0pt0[3],l0pt1[3],l1pt0[3],l1pt1[3];
   double newcell = 0;
   double minangle = VTK_DOUBLE_MAX;
@@ -2246,6 +2254,7 @@ void vtkIntersectionPolyDataFilter2::Impl
       //the angle of this it will make with the previous line
       if (neworient == loop->orientation)
       {
+	foundcell = 1;
 	pd->GetPoint(prevPt,l0pt0);
 	pd->GetPoint(nextPt,l0pt1);
 	vtkSmartPointer<vtkIdList> specialCellPoints = 
@@ -2279,13 +2288,24 @@ void vtkIntersectionPolyDataFilter2::Impl
 	  newcell = cellId;
 	}
       }
+      else if (neworient == 2)
+      {
+	extracell = cellId;
+      }
     }
   }
+  if (foundcell == 0)
+  {
+    std::cout<<"BAD BECAUSE NO CELL WITH CORRECT ORIENTATION FOUND"<<endl;
+    std::cout<<"Setting next cell to cell with small area: "<<extracell<<endl;
+    *nextCell = extracell;
+  }
+  else
+    *nextCell = newcell;
   //Set the next line to follow equal to the line that follows the 
   //orientation of the loop and has the minimum angle. Angle check is 
   //necessary because it is possible to have more than one line that follow
   //the loop orientation
-  *nextCell = newcell;
 }
 
 //---------------------------------------------------------------------------
@@ -2293,7 +2313,7 @@ void vtkIntersectionPolyDataFilter2::Impl
 void vtkIntersectionPolyDataFilter2::Impl
 ::SetLoopOrientation(vtkPolyData *pd,simPolygon *loop,vtkIdType *nextCell,
     vtkIdType nextPt, vtkIdType prevPt, vtkIdList *pointCells)
-{
+{ 
   //Set the orientation of this loop!
   double l0pt0[3],l0pt1[3],l1pt0[3],l1pt1[3];
   double mincell = 0;
@@ -2376,9 +2396,16 @@ int vtkIntersectionPolyDataFilter2::Impl::GetLoopOrientation(
 
   int orientation = 1;
 
+//  std::cout<<"Area "<<area<<endl;
   if (area < 0)
     orientation = -1;
+  if (fabs(area) < 1e-10)
+  {
+    std::cout<<"Very small area!"<<endl;
+    orientation = 2;
+  }
 
+//  std::cout<<"Orientation: "<<orientation<<endl;
   return orientation;
 }
 
