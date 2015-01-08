@@ -1092,6 +1092,8 @@ void vtkBooleanOperationPolyDataFilter2::Impl::DetermineIntersection(
   }
   std::cout<<"Number Of Loops: "<<loops->size()<<endl;
 
+  delete [] usedPt;
+
 }
 
 int vtkBooleanOperationPolyDataFilter2::Impl::RunLoopFind(

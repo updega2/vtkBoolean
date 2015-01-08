@@ -1420,7 +1420,9 @@ void vtkIntersectionPolyDataFilter2::Impl::AddToNewCellMap(
     vtkPolyData *interLines,int numCurrCells)
 {
 //std::cout<<"INTER POINTS ARE "<<interPts[0]<<" AND "<<interPts[1]<<endl;
-  vtkIdList *cellIds[interPtCount];
+  vtkIdList **cellIds;
+  cellIds = new vtkIdList*[interPtCount];
+
   for (int i=0;i<interPtCount;i++)
   {
     cellIds[i] = vtkIdList::New();
@@ -1461,11 +1463,12 @@ void vtkIntersectionPolyDataFilter2::Impl::AddToNewCellMap(
 	      1,numCurrCells);
       }
     }
-    for (int i=0;i<interPtCount;i++)
-    {
-      cellIds[i]->Delete();
-    }
   }
+  for (int i=0;i<interPtCount;i++)
+  {
+    cellIds[i]->Delete();
+  }
+  delete [] cellIds;
 }
 
 //----------------------------------------------------------------------------
@@ -1940,8 +1943,6 @@ int vtkIntersectionPolyDataFilter2::RequestData(vtkInformation*        vtkNotUse
     //Clean up
     impl->NewCellIds[0]->Delete();
     impl->NewCellIds[1]->Delete();
-    impl->BoundaryPoints[0]->Delete();
-    impl->BoundaryPoints[1]->Delete();
     impl->PointCellIds[0]->Delete();
     impl->PointCellIds[1]->Delete();
 
