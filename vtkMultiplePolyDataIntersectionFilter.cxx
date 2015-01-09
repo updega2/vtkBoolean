@@ -40,6 +40,8 @@ vtkMultiplePolyDataIntersectionFilter::vtkMultiplePolyDataIntersectionFilter()
   this->OutputPointsPrecision = vtkAlgorithm::DEFAULT_PRECISION;
   this->NoIntersectionOutput = 1;
   this->PassInfoAsGlobal = 0;
+  this->AssignSurfaceIds = 0;
+
   this->BooleanObject = vtkPolyData::New();
   this->IntersectionTable = NULL;
 }
@@ -144,6 +146,8 @@ int vtkMultiplePolyDataIntersectionFilter::BuildIntersectionTable(
   int totalIntersections=0;
   for (int i = 0;i < numInputs;i++)
     {
+    if (this->AssignSurfaceIds)
+      this->SetSurfaceId(inputs[i],i+1);
     int objectIntersections=0;
     double bounds0[6];
     inputs[i]->GetBounds(bounds0);
@@ -197,7 +201,6 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(
       for (int j = 0;j < numInputs; j++)
         {
 	  std::cout<<"INTERSECTION of "<<i<<" and "<<j<<endl;
-          this->PrintTable(numInputs);
 	//Bounding boxes intersect!
         if (this->IntersectionTable[i][j] == 1)
           {
@@ -206,7 +209,7 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(
 
 	  vtkSmartPointer<vtkBooleanOperationPolyDataFilter2> boolean = 
 	    vtkSmartPointer<vtkBooleanOperationPolyDataFilter2>::New();
-	  if (PassInfoAsGlobal && totalIntersections != 0)
+	  if (this->PassInfoAsGlobal && totalIntersections != 0)
 	    this->PreSetGlobalArrays(inputs[j]);
 
 	  boolean->SetInputData(0,this->BooleanObject);
@@ -227,7 +230,7 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(
 	    {
 	      totalIntersections++;
 	      this->BooleanObject->DeepCopy(boolean->GetOutput());
-	      if (PassInfoAsGlobal)
+	      if (this->PassInfoAsGlobal)
 		this->PostSetGlobalArrays(totalIntersections);
 
 	      checkInputArray2->InsertNextId(j);
@@ -238,6 +241,7 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(
 	    }
           }
         }
+        this->PrintTable(numInputs);
       }
       tmp = checkInputArray;
       checkInputArray = checkInputArray2;
@@ -301,6 +305,20 @@ void vtkMultiplePolyDataIntersectionFilter::PostSetGlobalArrays(
     newPointArray->SetName("GlobalBoundaryPoints");
     this->BooleanObject->GetPointData()->AddArray(newPointArray);
   }
+}
+
+void vtkMultiplePolyDataIntersectionFilter::SetSurfaceId(
+    vtkPolyData *input,int surfaceid)
+{
+  vtkSmartPointer<vtkIntArray> surfaceIdArray = 
+    vtkSmartPointer<vtkIntArray>::New();
+  int numCells = input->GetNumberOfCells();
+  for (int i = 0;i < numCells; i++)
+  {
+    surfaceIdArray->InsertValue(i,surfaceid);
+  }
+  surfaceIdArray->SetName("ModelFaceID");
+  input->GetCellData()->AddArray(surfaceIdArray);
 }
 
 void vtkMultiplePolyDataIntersectionFilter::PrintTable(int numInputs)

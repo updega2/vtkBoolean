@@ -151,6 +151,7 @@ int main(int argc, char *argv[])
     vesselInter->AddInputData(inputPDs[i]);
   }
   vesselInter->SetPassInfoAsGlobal(1);
+  vesselInter->SetAssignSurfaceIds(1);
   vesselInter->Update();
 
   fullpd->DeepCopy(vesselInter->GetOutput());

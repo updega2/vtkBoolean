@@ -105,6 +105,12 @@ public:
   vtkSetMacro(PassInfoAsGlobal,int);
   vtkGetMacro(PassInfoAsGlobal,int);
 
+  // Description:
+  // Set/get boolean to determine whether surfaces are given id information
+  // the output scalary array will be defined as "ModelFaceId"
+  vtkSetMacro(AssignSurfaceIds,int);
+  vtkGetMacro(AssignSurfaceIds,int);
+
 //ETX
 protected:
   vtkMultiplePolyDataIntersectionFilter();
@@ -130,6 +136,7 @@ protected:
   int UserManagedInputs;
   int NoIntersectionOutput;
   int PassInfoAsGlobal;
+  int AssignSurfaceIds;
 
   int **IntersectionTable;
   vtkPolyData *BooleanObject;
@@ -141,6 +148,8 @@ protected:
   //Function to set the boundary point information as global information
   void PreSetGlobalArrays(vtkPolyData *input);
   void PostSetGlobalArrays(int numIntersections);
+  //Function to set surface id
+  void SetSurfaceId(vtkPolyData *input,int surfaceid);
 
   //Function to print intersectiontable
   void PrintTable(int numInputs);

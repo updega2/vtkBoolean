@@ -148,7 +148,7 @@ protected:
     vtkIdType nextPt, vtkIdType prevPt, vtkIdList *pointCells);
 
   int GetLoopOrientation(vtkPolyData *pd,vtkIdType cell,vtkIdType ptId1,
-      vtkIdType ptId2);
+      vtkIdType ptId2,int first);
 
   void Orient(vtkPolyData *pd,vtkTransform *transform, vtkPolyData *boundary,
 		  vtkPolygon *boundarypoly);
@@ -1017,7 +1017,7 @@ vtkCellArray* vtkIntersectionPolyDataFilter2::Impl
 //    interPtIdList->GetNumberOfTuples()<<endl;
 //std::cout<<"NUMBER OF INTERSECTING LINES! "<<
 //    interceptlines->GetNumberOfCells()<<endl;
-//    std::cout<<"FULLCELLID: "<<cellId<<endl;
+    std::cout<<"FULLCELLID: "<<cellId<<endl;
     vtkSmartPointer<vtkPolyData> fullpd = vtkSmartPointer<vtkPolyData>::New();
     fullpd->SetPoints(points);
     fullpd->SetLines(lines);
@@ -1031,7 +1031,7 @@ vtkCellArray* vtkIntersectionPolyDataFilter2::Impl
     transformer->Update();
     transformedpd = transformer->GetOutput();
     transformedpd->BuildLinks();
-    if (cellId == 4385 && inputIndex == 0)
+    if (cellId == 70 && inputIndex == 0)
     {
       WriteVTPFile(transformedpd,"TransformedCell_"+int2String(cellId));
 
@@ -2129,6 +2129,8 @@ void vtkIntersectionPolyDataFilter2::Impl
   interPtBool[nextPt] = true;
   pd->GetCellPoints(nextCell,cellPoints);
 
+  std::cout<<"START POINT IS: "<<startPt<<endl;
+  std::cout<<"START CELL IS: "<<nextCell<<endl;
   simPoint newpoint;
   prevPt = nextPt;
   //Find next point by following line and choosing point that is not already
@@ -2146,6 +2148,7 @@ void vtkIntersectionPolyDataFilter2::Impl
   pd->GetPoint(newpoint.id,newpoint.pt);
   loop->points.push_back(newpoint);
   interPtBool[nextPt] = true;
+  std::cout<<"NEXT POINT IS: "<<nextPt<<endl;
 
   //Loop until we get back to the point we started at, completing the loop!
   while(nextPt != startPt)
@@ -2197,6 +2200,7 @@ void vtkIntersectionPolyDataFilter2::Impl
     }
     lineBool[nextCell] = true;
 
+    std::cout<<"NEXT CELL IS: "<<nextCell<<endl;
     prevPt = nextPt;
     pd->GetCellPoints(nextCell,cellPoints);
     simPoint internewpoint;
@@ -2213,6 +2217,7 @@ void vtkIntersectionPolyDataFilter2::Impl
     pd->GetPoint(internewpoint.id,internewpoint.pt);
     loop->points.push_back(internewpoint);
     interPtBool[nextPt] = true;
+    std::cout<<"NEXT POINT IS: "<<nextPt<<endl;
   }
   //Cell is boring; i.e. it only has boundary points. set the orientation
   if (intertype == 0)
@@ -2226,7 +2231,7 @@ void vtkIntersectionPolyDataFilter2::Impl
     else
       prevPt = cellPoints->GetId(0);
 
-    loop->orientation = this->GetLoopOrientation(pd,nextCell,prevPt,nextPt);
+    loop->orientation = this->GetLoopOrientation(pd,nextCell,prevPt,nextPt,1);
   }
 }
 
@@ -2248,7 +2253,7 @@ void vtkIntersectionPolyDataFilter2::Impl
     if (*nextCell != cellId)
     {
       //Get orientation for newly selected line
-      int neworient = this->GetLoopOrientation(pd,cellId,prevPt,nextPt);
+      int neworient = this->GetLoopOrientation(pd,cellId,prevPt,nextPt,0);
 
       //If the orientation of the newly selected line is correct, check 
       //the angle of this it will make with the previous line
@@ -2363,13 +2368,14 @@ void vtkIntersectionPolyDataFilter2::Impl
   //Set the next line as the line that makes the minimum angle with the 
   //precious cell and set the orientation of the loop
   *nextCell = mincell;
-  loop->orientation = this->GetLoopOrientation(pd,*nextCell,prevPt,nextPt);
+  loop->orientation = this->GetLoopOrientation(pd,*nextCell,prevPt,nextPt,1);
 }
 
 //---------------------------------------------------------------------------
 
 int vtkIntersectionPolyDataFilter2::Impl::GetLoopOrientation(
-    vtkPolyData *pd, vtkIdType cell, vtkIdType ptId1, vtkIdType ptId2)
+    vtkPolyData *pd, vtkIdType cell, vtkIdType ptId1, vtkIdType ptId2,
+    int first)
 {
   //Calculate the actual orientation of this loop, by calculating the signed
   //area of the triangle made by the three points
@@ -2399,7 +2405,7 @@ int vtkIntersectionPolyDataFilter2::Impl::GetLoopOrientation(
 //  std::cout<<"Area "<<area<<endl;
   if (area < 0)
     orientation = -1;
-  if (fabs(area) < 1e-10)
+  if (fabs(area) < 1e-10 && !first)
   {
     std::cout<<"Very small area!"<<endl;
     orientation = 2;
