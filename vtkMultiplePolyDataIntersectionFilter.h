@@ -98,6 +98,13 @@ public:
   vtkSetMacro(NoIntersectionOutput,int);
   vtkGetMacro(NoIntersectionOutput,int);
 
+  // Description:
+  // Set/get boolean to determine whether info such as BoundaryPoints
+  // is passed as global information. Local boundary scalars will be
+  // passed to the full boolean
+  vtkSetMacro(PassInfoAsGlobal,int);
+  vtkGetMacro(PassInfoAsGlobal,int);
+
 //ETX
 protected:
   vtkMultiplePolyDataIntersectionFilter();
@@ -122,6 +129,7 @@ protected:
   //User defined booleans for filter management
   int UserManagedInputs;
   int NoIntersectionOutput;
+  int PassInfoAsGlobal;
 
   int **IntersectionTable;
   vtkPolyData *BooleanObject;
@@ -130,6 +138,9 @@ protected:
   int BuildIntersectionTable(vtkPolyData* inputs[], int numInputs);
   //Function to run the intersection on intersecting polydatas
   int ExecuteIntersection(vtkPolyData *inputs[],int numInputs);
+  //Function to set the boundary point information as global information
+  void PreSetGlobalArrays(vtkPolyData *input);
+  void PostSetGlobalArrays(int numIntersections);
 
   //Function to print intersectiontable
   void PrintTable(int numInputs);

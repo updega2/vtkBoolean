@@ -56,6 +56,7 @@ public:
   vtkGetMacro(NumberOfIntersectionPoints, int);
   vtkSetMacro(NumberOfIntersectionPoints, int);
   vtkBooleanMacro(NumberOfIntersectionPoints, int);
+
   vtkGetMacro(NumberOfIntersectionLines, int);
   vtkSetMacro(NumberOfIntersectionLines, int);
   vtkBooleanMacro(NumberOfIntersectionLines, int);

@@ -968,7 +968,6 @@ int vtkBooleanOperationPolyDataFilter2::RequestData(
   std::vector<simLoop> loops;
   impl->DetermineIntersection(&loops);
 
-
   WriteVTP(impl->Mesh[0],"Surface0BooleanBefore");
   WriteVTP(impl->Mesh[1],"Surface1BooleanBefore");
 

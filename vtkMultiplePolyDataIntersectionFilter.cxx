@@ -39,6 +39,7 @@ vtkMultiplePolyDataIntersectionFilter::vtkMultiplePolyDataIntersectionFilter()
   this->UserManagedInputs = 0;
   this->OutputPointsPrecision = vtkAlgorithm::DEFAULT_PRECISION;
   this->NoIntersectionOutput = 1;
+  this->PassInfoAsGlobal = 0;
   this->BooleanObject = vtkPolyData::New();
   this->IntersectionTable = NULL;
 }
@@ -178,6 +179,7 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(
     vtkPolyData* inputs[], int numInputs)
 {                                            
   int numChecks = 0;  
+  int totalIntersections = 0;
   vtkSmartPointer<vtkIdList> checkInputArray = 
     vtkSmartPointer<vtkIdList>::New();
   vtkSmartPointer<vtkIdList> checkInputArray2 = 
@@ -204,6 +206,8 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(
 
 	  vtkSmartPointer<vtkBooleanOperationPolyDataFilter2> boolean = 
 	    vtkSmartPointer<vtkBooleanOperationPolyDataFilter2>::New();
+	  if (PassInfoAsGlobal && totalIntersections != 0)
+	    this->PreSetGlobalArrays(inputs[j]);
 
 	  boolean->SetInputData(0,this->BooleanObject);
 	  boolean->SetInputData(1,inputs[j]);
@@ -221,7 +225,11 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(
 	    }
 	  else 
 	    {
+	      totalIntersections++;
 	      this->BooleanObject->DeepCopy(boolean->GetOutput());
+	      if (PassInfoAsGlobal)
+		this->PostSetGlobalArrays(totalIntersections);
+
 	      checkInputArray2->InsertNextId(j);
 	      for (int k = 0;k < numInputs; k++)
 		{
@@ -237,6 +245,62 @@ int vtkMultiplePolyDataIntersectionFilter::ExecuteIntersection(
       tmp->Reset();
     }
   return 1;
+}
+
+void vtkMultiplePolyDataIntersectionFilter::PreSetGlobalArrays(
+    vtkPolyData *input)
+{
+  vtkSmartPointer<vtkIntArray> newPointArray = 
+    vtkSmartPointer<vtkIntArray>::New();
+  int numPts = input->GetNumberOfPoints();
+  for (int i = 0;i < numPts; i++)
+  {
+    newPointArray->InsertValue(i,0);
+  }
+  newPointArray->SetName("GlobalBoundaryPoints");
+  input->GetPointData()->AddArray(newPointArray);
+}
+
+void vtkMultiplePolyDataIntersectionFilter::PostSetGlobalArrays(
+    int numIntersections)
+{
+  std::cout<<"Passing Data"<<endl;
+  if (numIntersections == 1)
+  {
+    vtkSmartPointer<vtkIntArray> currentPointArray = 
+      vtkSmartPointer<vtkIntArray>::New();
+    currentPointArray = vtkIntArray::SafeDownCast(
+	this->BooleanObject->GetPointData()->GetArray("BoundaryPoints"));
+    
+    currentPointArray->SetName("GlobalBoundaryPoints");
+    this->BooleanObject->GetPointData()->AddArray(currentPointArray);
+  }
+  else
+  {
+    vtkSmartPointer<vtkIntArray> currentPointArray = 
+      vtkSmartPointer<vtkIntArray>::New();
+    vtkSmartPointer<vtkIntArray> globalPointArray = 
+      vtkSmartPointer<vtkIntArray>::New();
+    vtkSmartPointer<vtkIntArray> newPointArray = 
+      vtkSmartPointer<vtkIntArray>::New();
+    currentPointArray = vtkIntArray::SafeDownCast(
+	this->BooleanObject->GetPointData()->GetArray("BoundaryPoints"));
+    globalPointArray = vtkIntArray::SafeDownCast(
+	this->BooleanObject->GetPointData()->
+	GetArray("GlobalBoundaryPoints"));
+
+    int numPts = this->BooleanObject->GetNumberOfPoints();
+    for (int i = 0; i< numPts; i++)
+    {
+      newPointArray->InsertValue(i,0);
+      if (globalPointArray->GetValue(i) == 1 || 
+	  currentPointArray->GetValue(i) == 1)
+	newPointArray->InsertValue(i,1);
+    } 
+    this->BooleanObject->GetPointData()->RemoveArray("GlobalBoundaryPoints");
+    newPointArray->SetName("GlobalBoundaryPoints");
+    this->BooleanObject->GetPointData()->AddArray(newPointArray);
+  }
 }
 
 void vtkMultiplePolyDataIntersectionFilter::PrintTable(int numInputs)

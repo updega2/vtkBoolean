@@ -2092,7 +2092,7 @@ void vtkIntersectionPolyDataFilter2::Impl
   {
     if (lineBool[lineId] == false)
     {
-      std::cout<<"LINE FALSE: Find extra loop/s"<<endl;
+      //std::cout<<"LINE FALSE: Find extra loop/s"<<endl;
       pd->GetCellPoints(lineId,cellPoints);
       nextPt.id = cellPoints->GetId(0);
       pd->GetPoint(nextPt.id,nextPt.pt);
