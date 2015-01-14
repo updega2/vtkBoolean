@@ -85,13 +85,6 @@ public:
   vtkBooleanMacro(ParallelStreaming, int);
 
   // Description:
-  // Set/get the desired precision for the output types. See the documentation
-  // for the vtkAlgorithm::DesiredOutputPrecision enum for an explanation of
-  // the available precision settings.
-  vtkSetMacro(OutputPointsPrecision,int);
-  vtkGetMacro(OutputPointsPrecision,int);
-
-  // Description:
   // Set/get the boolean determing the output when two objects don't 
   // intersect. With a value of 1, either objects output. With a value of 1,
   // both objects are output. 
@@ -118,7 +111,6 @@ protected:
 
   // Flag for selecting parallel streaming behavior
   int ParallelStreaming;
-  int OutputPointsPrecision;
 
   // Usual data generation method
   virtual int RequestData(vtkInformation *,

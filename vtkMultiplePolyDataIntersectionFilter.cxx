@@ -37,7 +37,6 @@ vtkMultiplePolyDataIntersectionFilter::vtkMultiplePolyDataIntersectionFilter()
 {
   this->ParallelStreaming = 0;
   this->UserManagedInputs = 0;
-  this->OutputPointsPrecision = vtkAlgorithm::DEFAULT_PRECISION;
   this->NoIntersectionOutput = 1;
   this->PassInfoAsGlobal = 0;
   this->AssignSurfaceIds = 0;
@@ -468,8 +467,8 @@ void vtkMultiplePolyDataIntersectionFilter::PrintSelf(ostream& os,
 
   os << "ParallelStreaming:" << (this->ParallelStreaming?"On":"Off") << endl;
   os << "UserManagedInputs:" << (this->UserManagedInputs?"On":"Off") << endl;
-  os << indent << "Output Points Precision: " << this->OutputPointsPrecision
-     << endl;
+  os << "AssignSurfaceIds:" << (this->AssignSurfaceIds?"On":"Off") << endl;
+  os << "PassInfoAsGlobal:" << (this->PassInfoAsGlobal?"On":"Off") << endl;
 }
 
 //----------------------------------------------------------------------------
