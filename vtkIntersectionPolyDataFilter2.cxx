@@ -1017,7 +1017,7 @@ vtkCellArray* vtkIntersectionPolyDataFilter2::Impl
 //    interPtIdList->GetNumberOfTuples()<<endl;
 //std::cout<<"NUMBER OF INTERSECTING LINES! "<<
 //    interceptlines->GetNumberOfCells()<<endl;
-    std::cout<<"FULLCELLID: "<<cellId<<endl;
+    //std::cout<<"FULLCELLID: "<<cellId<<endl;
     vtkSmartPointer<vtkPolyData> fullpd = vtkSmartPointer<vtkPolyData>::New();
     fullpd->SetPoints(points);
     fullpd->SetLines(lines);
@@ -2129,8 +2129,8 @@ void vtkIntersectionPolyDataFilter2::Impl
   interPtBool[nextPt] = true;
   pd->GetCellPoints(nextCell,cellPoints);
 
-  std::cout<<"START POINT IS: "<<startPt<<endl;
-  std::cout<<"START CELL IS: "<<nextCell<<endl;
+  //std::cout<<"START POINT IS: "<<startPt<<endl;
+  //std::cout<<"START CELL IS: "<<nextCell<<endl;
   simPoint newpoint;
   prevPt = nextPt;
   //Find next point by following line and choosing point that is not already
@@ -2148,7 +2148,7 @@ void vtkIntersectionPolyDataFilter2::Impl
   pd->GetPoint(newpoint.id,newpoint.pt);
   loop->points.push_back(newpoint);
   interPtBool[nextPt] = true;
-  std::cout<<"NEXT POINT IS: "<<nextPt<<endl;
+  //std::cout<<"NEXT POINT IS: "<<nextPt<<endl;
 
   //Loop until we get back to the point we started at, completing the loop!
   while(nextPt != startPt)
@@ -2200,7 +2200,7 @@ void vtkIntersectionPolyDataFilter2::Impl
     }
     lineBool[nextCell] = true;
 
-    std::cout<<"NEXT CELL IS: "<<nextCell<<endl;
+    //std::cout<<"NEXT CELL IS: "<<nextCell<<endl;
     prevPt = nextPt;
     pd->GetCellPoints(nextCell,cellPoints);
     simPoint internewpoint;
@@ -2217,7 +2217,7 @@ void vtkIntersectionPolyDataFilter2::Impl
     pd->GetPoint(internewpoint.id,internewpoint.pt);
     loop->points.push_back(internewpoint);
     interPtBool[nextPt] = true;
-    std::cout<<"NEXT POINT IS: "<<nextPt<<endl;
+    //std::cout<<"NEXT POINT IS: "<<nextPt<<endl;
   }
   //Cell is boring; i.e. it only has boundary points. set the orientation
   if (intertype == 0)

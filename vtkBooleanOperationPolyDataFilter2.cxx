@@ -1074,6 +1074,7 @@ void vtkBooleanOperationPolyDataFilter2::Impl::DetermineIntersection(
 
       simLoop newloop;
       newloop.startPt = interPt;
+      std::cout<<"Loop Start Point is: "<<interPt<<endl;
       caseId = this->RunLoopFind(interPt,nextCell,usedPt,&newloop);
       if (caseId != -1)
       {
@@ -1120,6 +1121,7 @@ int vtkBooleanOperationPolyDataFilter2::Impl::RunLoopFind(
   newline.pt2 = nextPt;
   newline.id = nextCell;
   loop->cells.push_back(newline);
+  std::cout<<"Loop Second Point is: "<<nextPt<<endl;
 
   usedPt[nextPt] = true;
   while(nextPt != loop->cells.front().pt1)

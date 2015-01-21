@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
   {
     inputFilenames[i] = argv[i+1];
     inputPDs[i] = vtkPolyData::New();
-    ReadSTLFile(inputFilenames[i],inputPDs[i]);
+    ReadVTPFile(inputFilenames[i],inputPDs[i]);
   }
 
   vtkSmartPointer<vtkPolyData> fullpd = 
